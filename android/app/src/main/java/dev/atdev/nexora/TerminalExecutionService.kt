@@ -113,7 +113,7 @@ class TerminalExecutionService : Service() {
         )
         return if (Build.VERSION.SDK_INT >= 26) {
             Notification.Builder(this, channelId)
-                .setSmallIcon(android.R.drawable.stat_sys_terminal)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setContentTitle("NEXORA")
                 .setContentText(message.take(120))
                 .setContentIntent(openApp)
@@ -123,7 +123,7 @@ class TerminalExecutionService : Service() {
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setSmallIcon(android.R.drawable.stat_sys_terminal)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
                 .setContentTitle("NEXORA")
                 .setContentText(message.take(120))
                 .setContentIntent(openApp)
