@@ -188,8 +188,7 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
 fn print_completions(prefix: &str) {
     let mut candidates = BTreeSet::new();
     let builtins = [
-        "help", "version", "clear", "exit", "history", "complete",
-        "echo", "pwd", "ls", "cd",
+        "help", "version", "clear", "exit", "history", "complete", "echo", "pwd", "ls", "cd",
     ];
 
     for command in builtins {
