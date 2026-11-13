@@ -6,9 +6,9 @@ NEXORA is an independent, cross-platform terminal environment project targeting 
 
 The project is developed as a modular terminal engine first, so its command system can be reused by platform-specific interfaces without tying the core to one UI framework.
 
-## Continuous integration
+## Android application\n\nA native Kotlin Android frontend prototype now lives in `android/`. It provides a terminal-style interface with built-in commands and an app-private filesystem workspace. Arbitrary shell execution is not enabled, and the Kotlin prototype is not yet connected to the shared Rust engine; JNI integration remains planned.\n\n## Continuous integration
 
-GitHub Actions validates every push and pull request targeting `main` on Ubuntu and Windows. The workflow checks formatting, compiles the workspace, and runs all tests.
+GitHub Actions validates every push and pull request targeting `main` on Ubuntu and Windows. The workflow checks Rust formatting, compiles the Rust workspace, runs its tests on Ubuntu and Windows, and builds the Android debug APK.
 
 ## Project status
 
