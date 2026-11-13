@@ -87,6 +87,30 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Package verified PRoot binaries for Android ABIs
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/jniLibs
+          release="$(curl -fsSL https://api.github.com/repos/ahmed-alnassif/proot/releases/latest)"
+          for pair in "arm64-v8a:aarch64" "armeabi-v7a:arm" "x86_64:x86_64" "x86:x86"; do
+            abi="${pair%%:*}"
+            arch="${pair##*:}"
+            asset="proot-${arch}.zip"
+            url="$(jq -r --arg n "$asset" '.assets[] | select(.name==$n) | .browser_download_url' <<< "$release")"
+            digest="$(jq -r --arg n "$asset" '.assets[] | select(.name==$n) | .digest' <<< "$release" | sed 's/^sha256://')"
+            test -n "$url" && [[ "$digest" =~ ^[a-fA-F0-9]{64}$ ]]
+            curl -fL "$url" -o "/tmp/$asset"
+            echo "$digest  /tmp/$asset" | sha256sum -c -
+            mkdir -p "/tmp/proot-$abi"
+            unzip -q "/tmp/$asset" -d "/tmp/proot-$abi"
+            binary="$(find "/tmp/proot-$abi" -type f -name proot -print -quit)"
+            test -n "$binary"
+            mkdir -p "app/src/main/jniLibs/$abi"
+            install -m 0755 "$binary" "app/src/main/jniLibs/$abi/libproot.so"
+          done
+
       - name: Build Android debug APK
         working-directory: android
         run: gradle assembleDebug
