@@ -12,12 +12,18 @@ permissions:
 
 jobs:
   validate:
-    name: Validate on ${{ matrix.os }}
+    name: Validate and build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: nexora-linux-x64
+            binary_path: target/release/nex
+          - os: windows-latest
+            artifact_name: nexora-windows-x64
+            binary_path: target/release/nex.exe
 
     steps:
       - name: Check out repository
@@ -36,6 +42,27 @@ jobs:
 
       - name: Run tests
         run: cargo test --workspace
+
+      - name: Build release CLI
+        run: cargo build --workspace --release
+
+      - name: Upload Linux CLI
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexora-linux-x64
+          path: target/release/nex
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Windows CLI
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexora-windows-x64
+          path: target/release/nex.exe
+          if-no-files-found: error
+          retention-days: 14
 
   android-build:
     name: Build Android app
