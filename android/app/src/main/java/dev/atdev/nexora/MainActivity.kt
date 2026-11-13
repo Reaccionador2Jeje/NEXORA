@@ -338,6 +338,56 @@ class MainActivity : Activity() {
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
+    private fun installUbuntuRuntime() {
+        if (ubuntuRuntime.isInstalled()) {
+            appendLine("Ubuntu runtime is already installed.")
+            return
+        }
+        val encrypted = preferences.getString("ubuntu_password_enc", null)
+        if (encrypted.isNullOrBlank()) {
+            appendLine("Ubuntu password is missing. Reconfigure the profile.")
+            return
+        }
+        val password = try {
+            decryptPassword(encrypted)
+        } catch (error: Exception) {
+            appendLine("Could not unlock Ubuntu password: ${error.message}")
+            return
+        }
+        appendLine("Starting Ubuntu 24.04 LTS installation…")
+        input.isEnabled = false
+        ubuntuRuntime.install(username, password, { message ->
+            runOnUiThread { appendLine(message) }
+        }) { success, message, uid ->
+            runOnUiThread {
+                input.isEnabled = true
+                if (success) {
+                    ubuntuUid = uid
+                    preferences.edit().putInt("ubuntu_uid", uid).apply()
+                    appendLine(message)
+                    appendLine("You can now run Linux commands directly.")
+                } else {
+                    appendLine("Ubuntu installation failed: $message")
+                    appendLine("Run install-ubuntu again to retry.")
+                }
+                promptLabel.text = "$username@$hostname:~$ "
+                input.requestFocus()
+            }
+        }
+    }
+
+    private fun decryptPassword(encoded: String): String {
+        val payload = Base64.decode(encoded, Base64.NO_WRAP)
+        require(payload.size > 12) { "Invalid encrypted password" }
+        val iv = payload.copyOfRange(0, 12)
+        val ciphertext = payload.copyOfRange(12, payload.size)
+        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val key = keyStore.getKey("nexora_ubuntu_password_key", null) as SecretKey
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+        return String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)
+    }
+
     private fun handleShortcut(key: String) {
         when (key) {
             "ESC" -> Unit
