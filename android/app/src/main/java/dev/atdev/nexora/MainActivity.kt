@@ -294,13 +294,18 @@ class MainActivity : Activity() {
 
     private fun printWelcome() {
         output.text = ""
-        appendLine("NEXORA 0.2.0 — Android")
+        appendLine("NEXORA 0.3.0 — Android")
         appendLine("Ubuntu profile: $username@$hostname")
-        appendLine("Home target: /home/$username")
+        appendLine("Home: /home/$username")
         appendLine("Your Terminal. Your Universe.")
         appendLine("")
-        appendLine("Profile saved securely. Ubuntu userspace provisioning is the next integration stage.")
-        appendLine("This preview currently runs NEXORA's safe local commands, not an Ubuntu shell.")
+        if (ubuntuRuntime.isInstalled()) {
+            appendLine("Ubuntu 24.04 runtime: READY")
+            appendLine("Linux commands are routed to Ubuntu.")
+        } else {
+            appendLine("Ubuntu runtime: NOT INSTALLED")
+            appendLine("Run install-ubuntu to provision Ubuntu 24.04.")
+        }
         appendLine("Type 'help' to see available commands.")
         promptLabel.text = prompt
         input.requestFocus()
@@ -321,22 +326,37 @@ class MainActivity : Activity() {
         val parts = line.split(Regex("\\s+"), limit = 2)
         val command = parts[0].lowercase(Locale.ROOT)
         val argument = parts.getOrNull(1).orEmpty()
+
         when (command) {
             "help" -> {
-                appendLine("NEXORA commands: help, version, clear, echo, pwd, ls, cd, date, whoami, hostname, exit")
-                appendLine("Ubuntu profile is configured; full Ubuntu command execution is not enabled yet.")
+                appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, exit")
+                appendLine("Ubuntu commands: git, apt, bash, python3, ls, cd, pwd, cat, nano, etc.")
             }
-            "version" -> appendLine("NEXORA Android 0.2.0")
+            "version" -> appendLine("NEXORA Android 0.3.0")
             "clear", "cls" -> output.text = ""
-            "echo" -> appendLine(argument)
-            "pwd" -> appendLine("/home/$username" + if (workingDirectory == filesDir) "" else "/${workingDirectory.relativeTo(filesDir).path}")
-            "whoami" -> appendLine(username)
-            "hostname" -> appendLine(hostname)
-            "date" -> appendLine(SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy", Locale.getDefault()).format(Date()))
-            "ls", "dir" -> listFiles(argument)
-            "cd" -> changeDirectory(argument)
-            "exit", "logout" -> appendLine("Ubuntu session will close when the Ubuntu runtime is connected.")
-            else -> appendLine("nex: '$command' is unavailable until the Ubuntu runtime is integrated.")
+            "install-ubuntu" -> installUbuntuRuntime()
+            "ubuntu-status" -> appendLine(
+                if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 runtime: installed"
+                else "Ubuntu runtime: not installed. Run install-ubuntu."
+            )
+            "exit", "logout" -> appendLine("Command execution uses isolated Ubuntu processes.")
+            else -> {
+                if (!ubuntuRuntime.isInstalled()) {
+                    appendLine("Ubuntu runtime is not installed. Run install-ubuntu first.")
+                } else {
+                    input.isEnabled = false
+                    ubuntuRuntime.execute(line, username, ubuntuUid, { result ->
+                        runOnUiThread { appendLine(result) }
+                    }) { code ->
+                        runOnUiThread {
+                            appendLine("[process exited with code $code]")
+                            input.isEnabled = true
+                            promptLabel.text = prompt
+                            input.requestFocus()
+                        }
+                    }
+                }
+            }
         }
         promptLabel.text = prompt
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
