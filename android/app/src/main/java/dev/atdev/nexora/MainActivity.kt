@@ -69,6 +69,23 @@ class MainActivity : Activity() {
                     promptLabel.text = prompt
                     input.requestFocus()
                 }
+                TerminalExecutionService.ACTION_INSTALL_FINISHED -> {
+                    val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_INSTALL_SUCCESS, false)
+                    val message = intent.getStringExtra(TerminalExecutionService.EXTRA_INSTALL_MESSAGE).orEmpty()
+                    val uid = intent.getIntExtra(TerminalExecutionService.EXTRA_INSTALL_UID, -1)
+                    input.isEnabled = true
+                    if (success && uid > 0) {
+                        ubuntuUid = uid
+                        preferences.edit().putInt("ubuntu_uid", uid).apply()
+                        appendLine(message)
+                        appendLine("Ubuntu is ready. You can now run Linux commands.")
+                    } else {
+                        appendLine("Ubuntu installation failed: $message")
+                        appendLine("Run install-ubuntu again to resume/retry.")
+                    }
+                    promptLabel.text = prompt
+                    input.requestFocus()
+                }
             }
         }
     }
@@ -472,25 +489,20 @@ class MainActivity : Activity() {
             appendLine("Could not unlock Ubuntu password: ${error.message}")
             return
         }
-        appendLine("Starting Ubuntu 24.04 LTS installation…")
+        appendLine("Starting Ubuntu 24.04 LTS installation in background…")
+        appendLine("You can switch apps; keep the NEXORA notification active.")
         input.isEnabled = false
-        ubuntuRuntime.install(username, password, { message ->
-            runOnUiThread { appendLine(message) }
-        }) { success, message, uid ->
-            runOnUiThread {
-                input.isEnabled = true
-                if (success) {
-                    ubuntuUid = uid
-                    preferences.edit().putInt("ubuntu_uid", uid).apply()
-                    appendLine(message)
-                    appendLine("You can now run Linux commands directly.")
-                } else {
-                    appendLine("Ubuntu installation failed: $message")
-                    appendLine("Run install-ubuntu again to retry.")
-                }
-                promptLabel.text = "$username@$hostname:~$ "
-                input.requestFocus()
-            }
+        val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
+            action = TerminalExecutionService.ACTION_INSTALL_UBUNTU
+            putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
+            putExtra(TerminalExecutionService.EXTRA_INSTALL_PASSWORD, password)
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
+            else startService(serviceIntent)
+        } catch (error: Exception) {
+            input.isEnabled = true
+            appendLine("Could not start Ubuntu background installer: ${error.message}")
         }
     }
 
