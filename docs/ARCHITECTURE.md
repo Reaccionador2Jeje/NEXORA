@@ -9,19 +9,26 @@ NEXORA uses a Rust Cargo workspace with two crates.
 The platform-neutral library owns:
 - Version information.
 - Command-line tokenization.
-- Command classification.
+- Command classification for built-ins and external programs.
 - A small, reusable command model.
 
 It intentionally avoids terminal UI dependencies and platform-specific windowing APIs.
 
 ### `nexora-cli`
 
-The initial desktop CLI frontend owns:
+The initial CLI frontend owns:
 - The interactive prompt.
 - Terminal input and output.
 - Built-in command execution.
 - Current working-directory state.
+- Persistent command history (up to 500 entries).
+- History recall through `!N`.
+- Command suggestions from built-ins and executables found in `PATH`.
 - Launching external programs with `std::process::Command`.
+
+History is stored under the user's application data directory:
+- Windows: `%APPDATA%/nexora/history.txt`.
+- Unix-like systems: `$XDG_DATA_HOME/nexora/history.txt`, falling back to `~/.local/share/nexora/history.txt`.
 
 ## Planned platform frontends
 
@@ -44,8 +51,9 @@ A Windows desktop frontend will host the shared command engine and provide a nat
 ## Near-term roadmap
 
 1. Establish the shared command engine and CLI baseline.
-2. Add command history, completion, and structured command errors.
-3. Define platform adapter interfaces.
-4. Build the Windows desktop frontend.
-5. Build the Android frontend and package pipeline.
-6. Add a package/environment manager after the platform storage model is defined.
+2. Add persistent history and command suggestions.
+3. Add interactive line editing and Tab-key completion.
+4. Define platform adapter interfaces.
+5. Build the Windows desktop frontend.
+6. Build the Android frontend and package pipeline.
+7. Add a package/environment manager after the platform storage model is defined.
