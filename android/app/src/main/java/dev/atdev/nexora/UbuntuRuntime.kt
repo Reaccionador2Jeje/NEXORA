@@ -158,7 +158,21 @@ class UbuntuRuntime(context: Context) {
                         e.isLink -> {
                             target.parentFile?.mkdirs()
                             val source = File(stage, e.linkName.removePrefix("/")).canonicalFile
-                            if (source.exists()) Os.link(source.absolutePath, target.absolutePath)
+                            check(source.exists() && source.isFile) {
+                                "Ubuntu archive hard-link target is missing: ${e.linkName}"
+                            }
+
+                            // Android puede bloquear hard links (EACCES) en el sandbox.
+                            // En ese caso copiamos el contenido: PRoot puede trabajar con
+                            // archivos normales y --link2symlink cubre los enlaces del rootfs.
+                            try {
+                                Os.link(source.absolutePath, target.absolutePath)
+                            } catch (_: Exception) {
+                                source.copyTo(target, overwrite = true)
+                                target.setReadable(source.canRead(), false)
+                                target.setWritable(source.canWrite(), false)
+                                target.setExecutable(source.canExecute(), false)
+                            }
                         }
                         e.isFile -> {
                             target.parentFile?.mkdirs()
