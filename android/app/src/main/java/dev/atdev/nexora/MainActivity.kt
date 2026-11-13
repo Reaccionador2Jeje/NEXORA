@@ -45,6 +45,8 @@ class MainActivity : Activity() {
     private var historyIndex = 0
     private var username = "user"
     private var hostname = "nexora"
+    private lateinit var ubuntuRuntime: UbuntuRuntime
+    private var ubuntuUid = 10000
 
     private val preferences by lazy { getSharedPreferences("nexora", MODE_PRIVATE) }
     private val prompt: String
@@ -52,6 +54,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ubuntuRuntime = UbuntuRuntime(this)
+        ubuntuUid = preferences.getInt("ubuntu_uid", 10000)
         username = preferences.getString("ubuntu_username", "user") ?: "user"
         hostname = preferences.getString("ubuntu_hostname", "nexora") ?: "nexora"
         workingDirectory = preferences.getString("working_directory", filesDir.absolutePath)
