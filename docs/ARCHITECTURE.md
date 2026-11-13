@@ -30,7 +30,7 @@ History is stored under the user's application data directory:
 - Windows: `%APPDATA%/nexora/history.txt`.
 - Unix-like systems: `$XDG_DATA_HOME/nexora/history.txt`, falling back to `~/.local/share/nexora/history.txt`.
 
-## Planned platform frontends
+## Android frontend (prototype)\n\nThe `android/` directory contains a native Kotlin application with a terminal-style UI. The first preview implements basic commands and confines filesystem navigation to the app-private files directory. It deliberately does not execute arbitrary shell commands. It currently runs independently of `nexora-core`; JNI integration and shared command execution are the next step.\n\n## Planned platform frontends
 
 ### Android
 
@@ -55,5 +55,5 @@ A Windows desktop frontend will host the shared command engine and provide a nat
 3. Add interactive line editing and Tab-key completion.
 4. Define platform adapter interfaces.
 5. Build the Windows desktop frontend.
-6. Build the Android frontend and package pipeline.
+6. Integrate the Android Kotlin frontend with `nexora-core` through JNI and build the APK pipeline.
 7. Add a package/environment manager after the platform storage model is defined.
