@@ -69,7 +69,7 @@ class TerminalExecutionService : Service() {
                     }
                 }
                 UbuntuRuntime(this).execute(
-                    command,
+                    command ?: return@Thread,
                     username,
                     uid,
                     bridge.sharedDirectory,
