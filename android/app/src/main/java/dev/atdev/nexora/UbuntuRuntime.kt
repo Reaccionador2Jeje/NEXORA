@@ -44,14 +44,19 @@ class UbuntuRuntime(context: Context) {
         }.start()
     }
 
-    fun execute(command: String, user: String, uid: Int, line: (String) -> Unit, done: (Int) -> Unit) {
+    fun execute(command: String, user: String, uid: Int, androidShared: File? = null, line: (String) -> Unit, done: (Int) -> Unit) {
         Thread {
             var code = 1
             try {
                 val elevated = command.trimStart().startsWith("sudo ")
                 val actual = if (elevated) command.trimStart().removePrefix("sudo ") else command
                 val args = mutableListOf(proot.absolutePath, "--link2symlink", "-r", root.absolutePath,
-                    "-b", "/dev", "-b", "/proc", "-b", "/sys", "-w", "/home/$user")
+                    "-b", "/dev", "-b", "/proc", "-b", "/sys")
+                if (androidShared != null) {
+                    File(root, "mnt/android").mkdirs()
+                    args.addAll(listOf("-b", androidShared.absolutePath + ":/mnt/android"))
+                }
+                args.addAll(listOf("-w", "/home/$user"))
                 if (elevated) args.add("-0") else args.addAll(listOf("-i", "$uid:$uid"))
                 args.addAll(listOf("/usr/bin/env", "HOME=/home/$user", "USER=$user", "LOGNAME=$user",
                     "TERM=xterm-256color", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
