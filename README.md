@@ -6,6 +6,10 @@ NEXORA is an independent, cross-platform terminal environment project targeting 
 
 The project is developed as a modular terminal engine first, so its command system can be reused by platform-specific interfaces without tying the core to one UI framework.
 
+## Continuous integration
+
+GitHub Actions validates every push and pull request targeting `main` on Ubuntu and Windows. The workflow checks formatting, compiles the workspace, and runs all tests.
+
 ## Project status
 
 **Early development — version 0.1.0**
