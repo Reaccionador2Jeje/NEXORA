@@ -18,8 +18,8 @@ class UbuntuRuntime(context: Context) {
     private val app = context.applicationContext
     private val base = File(app.filesDir, "ubuntu")
     private val root = File(base, "rootfs")
-    private val binDir = File(base, "runtime")
-    private val proot = File(binDir, "proot")
+    // Android permits execution of APK-extracted native libraries; writable filesDir may be mounted noexec.
+    private val proot = File(app.applicationInfo.nativeLibraryDir, "libproot.so")
 
     fun isInstalled() = proot.canExecute() && File(root, "bin/bash").isFile
 
@@ -27,7 +27,7 @@ class UbuntuRuntime(context: Context) {
         Thread {
             try {
                 base.mkdirs()
-                if (!proot.exists()) installProot(progress)
+                installProot(progress)
                 ensureProotExecutable()
                 if (!File(root, "bin/bash").exists()) installUbuntu(progress)
                 progress("Creating Ubuntu account…")
@@ -74,54 +74,10 @@ class UbuntuRuntime(context: Context) {
     }
 
     private fun installProot(progress: (String) -> Unit) {
-        val abi = supportedAbi()
-        val arch = when (abi) {
-            "arm64-v8a" -> "aarch64"
-            "armeabi-v7a", "armeabi" -> "arm"
-            "x86_64" -> "x86_64"
-            "x86" -> "x86"
-            else -> error("Unsupported Android ABI: $abi")
+        progress("Checking bundled PRoot runtime…")
+        check(proot.isFile && proot.length() > 0L) {
+            "PRoot is missing from this APK for ABI ${Build.SUPPORTED_ABIS.joinToString()}. Rebuild the APK with the Android CI workflow."
         }
-        val release = JSONObject(fetchText("https://api.github.com/repos/ahmed-alnassif/proot/releases/latest"))
-        val assets = release.getJSONArray("assets")
-        var url: String? = null
-        var digest: String? = null
-        for (i in 0 until assets.length()) {
-            val a = assets.getJSONObject(i)
-            if (a.optString("name") == "proot-$arch.zip") {
-                url = a.optString("browser_download_url")
-                digest = a.optString("digest").removePrefix("sha256:")
-                break
-            }
-        }
-        check(!url.isNullOrBlank() && digest?.matches(Regex("[a-fA-F0-9]{64}")) == true) {
-            "No verified PRoot release for $arch"
-        }
-        val zipFile = File(base, "proot.zip.part")
-        downloadResumable(url!!, zipFile, progress)
-        if (!sha256(zipFile).equals(digest, true)) {
-            zipFile.delete()
-            error("PRoot SHA-256 verification failed; the incomplete download was discarded")
-        }
-        binDir.mkdirs()
-        ZipInputStream(BufferedInputStream(FileInputStream(zipFile))).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                val target = File(binDir, entry.name).canonicalFile
-                check(target.path == binDir.canonicalPath || target.path.startsWith(binDir.canonicalPath + File.separator)) {
-                    "Unsafe path in PRoot archive"
-                }
-                if (entry.isDirectory) target.mkdirs() else {
-                    target.parentFile?.mkdirs()
-                    FileOutputStream(target).use { zip.copyTo(it) }
-                }
-                zip.closeEntry()
-            }
-        }
-        zipFile.delete()
-        val executable = if (proot.isFile) proot else binDir.walkTopDown().firstOrNull { it.isFile && it.name == "proot" }
-        check(executable != null) { "PRoot binary missing from archive" }
-        if (executable != proot) executable!!.copyTo(proot, true)
         ensureProotExecutable()
     }
 
