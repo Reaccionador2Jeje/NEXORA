@@ -115,6 +115,41 @@ class MainActivity : Activity() {
         }
         root.addView(status)
 
+        val promptRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(3), dp(6), dp(3))
+            setBackgroundColor(0xFF172235.toInt())
+        }
+        promptLabel = TextView(this).apply {
+            text = prompt
+            textSize = 12f
+            typeface = Typeface.MONOSPACE
+            setTextColor(0xFF86EFAC.toInt())
+            maxWidth = dp(160)
+        }
+        promptRow.addView(promptLabel)
+        input = EditText(this).apply {
+            setSingleLine(true)
+            textSize = 13f
+            typeface = Typeface.MONOSPACE
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0xFF71819D.toInt())
+            hint = "command"
+            imeOptions = EditorInfo.IME_ACTION_SEND
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setBackgroundColor(0x00000000)
+            setPadding(dp(5), 0, dp(4), 0)
+            setOnEditorActionListener { _, actionId, event ->
+                val enter = actionId == EditorInfo.IME_ACTION_SEND ||
+                    actionId == EditorInfo.IME_ACTION_DONE ||
+                    (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)
+                if (enter) { submitCommand(); true } else false
+            }
+        }
+        promptRow.addView(input, LinearLayout.LayoutParams(0, dp(48), 1f))
+        root.addView(promptRow)
+
         scroll = ScrollView(this).apply {
             isFillViewport = true
             setClipToPadding(false)
@@ -164,41 +199,6 @@ class MainActivity : Activity() {
         }
         shortcutsScroll.addView(shortcuts)
         root.addView(shortcutsScroll)
-
-        val promptRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), dp(3), dp(6), dp(3))
-            setBackgroundColor(0xFF172235.toInt())
-        }
-        promptLabel = TextView(this).apply {
-            text = prompt
-            textSize = 12f
-            typeface = Typeface.MONOSPACE
-            setTextColor(0xFF86EFAC.toInt())
-            maxWidth = dp(160)
-        }
-        promptRow.addView(promptLabel)
-        input = EditText(this).apply {
-            setSingleLine(true)
-            textSize = 13f
-            typeface = Typeface.MONOSPACE
-            setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFF71819D.toInt())
-            hint = "command"
-            imeOptions = EditorInfo.IME_ACTION_SEND
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            setBackgroundColor(0x00000000)
-            setPadding(dp(5), 0, dp(4), 0)
-            setOnEditorActionListener { _, actionId, event ->
-                val enter = actionId == EditorInfo.IME_ACTION_SEND ||
-                    actionId == EditorInfo.IME_ACTION_DONE ||
-                    (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)
-                if (enter) { submitCommand(); true } else false
-            }
-        }
-        promptRow.addView(input, LinearLayout.LayoutParams(0, dp(48), 1f))
-        root.addView(promptRow)
         setContentView(root)
     }
 
