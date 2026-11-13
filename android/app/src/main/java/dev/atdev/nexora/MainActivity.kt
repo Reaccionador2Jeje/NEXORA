@@ -76,7 +76,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(10), 0, 0)
         }
         input = EditText(this).apply {
-            singleLine = true
+            setSingleLine(true)
             textSize = 14f
             typeface = Typeface.MONOSPACE
             setTextColor(0xFFFFFFFF.toInt())
