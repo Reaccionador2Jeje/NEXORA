@@ -4,20 +4,23 @@
 
 NEXORA is an independent, cross-platform terminal environment project targeting **Android and Windows**.
 
-The project is being developed as a modular terminal engine first, so its command system can be reused by platform-specific interfaces without tying the core to one UI framework.
+The project is developed as a modular terminal engine first, so its command system can be reused by platform-specific interfaces without tying the core to one UI framework.
 
 ## Project status
 
 **Early development — version 0.1.0**
 
-The first milestone provides:
-- A Rust workspace with a reusable command-engine library.
-- A small interactive terminal application named `nex`.
-- Built-in commands: `help`, `version`, `clear`, `echo`, `pwd`, `ls`, `cd`, and `exit`.
+Current foundation:
+- Rust workspace with a reusable command-engine library.
+- Interactive CLI named `nex`.
+- Built-in commands: `help`, `version`, `clear`, `echo`, `pwd`, `ls`, `cd`, `history`, and `complete`.
+- Persistent command history (up to 500 entries).
+- History recall using `!N`.
+- Command suggestions from built-ins and executables found in `PATH`.
 - External program launching through the operating system, without passing input through a shell.
-- A platform-neutral core with no third-party Rust dependencies.
+- Platform-neutral core with no third-party Rust dependencies.
 
-The Android graphical application and the Windows graphical application are planned platform frontends; they are **not yet included** in this initial milestone.
+History and completion are currently command-based. Interactive Tab-key editing, arrow-key history navigation, and the Android/Windows graphical applications are not implemented yet.
 
 ## Repository layout
 
@@ -30,12 +33,10 @@ NEXORA/
 ├── crates/
 │   ├── nexora-core/
 │   │   ├── Cargo.toml
-│   │   └── src/
-│   │       └── lib.rs
+│   │   └── src/lib.rs
 │   └── nexora-cli/
 │       ├── Cargo.toml
-│       └── src/
-│           └── main.rs
+│       └── src/main.rs
 └── docs/
     └── ARCHITECTURE.md
 ```
@@ -48,8 +49,6 @@ NEXORA/
 
 ## Build and run
 
-From the repository root:
-
 ```bash
 cargo run -p nexora-cli
 ```
@@ -61,7 +60,7 @@ cargo run -p nexora-cli -- --version
 cargo run -p nexora-cli -- --help
 ```
 
-Run the test suite:
+Run tests:
 
 ```bash
 cargo test --workspace
@@ -69,15 +68,14 @@ cargo test --workspace
 
 ## Command examples
 
-Inside NEXORA:
-
 ```text
 nexora> help
 nexora> pwd
 nexora> ls
 nexora> echo Hello from NEXORA
-nexora> cd ..
-nexora> version
+nexora> history
+nexora> complete git
+nexora> !2
 nexora> exit
 ```
 
