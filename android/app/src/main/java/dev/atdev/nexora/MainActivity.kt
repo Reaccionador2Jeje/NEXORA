@@ -1,6 +1,14 @@
 package dev.atdev.nexora
 
 import android.app.Activity
+import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.app.AlertDialog
 import android.graphics.Typeface
 import android.os.Bundle
@@ -47,6 +55,23 @@ class MainActivity : Activity() {
     private var hostname = "nexora"
     private lateinit var ubuntuRuntime: UbuntuRuntime
     private var ubuntuUid = 10000
+    private var terminalReceiverRegistered = false
+
+    private val terminalReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                TerminalExecutionService.ACTION_OUTPUT ->
+                    appendLine(intent.getStringExtra(TerminalExecutionService.EXTRA_OUTPUT).orEmpty())
+                TerminalExecutionService.ACTION_FINISHED -> {
+                    val code = intent.getIntExtra(TerminalExecutionService.EXTRA_EXIT_CODE, 1)
+                    appendLine("[process exited with code $code]")
+                    input.isEnabled = true
+                    promptLabel.text = prompt
+                    input.requestFocus()
+                }
+            }
+        }
+    }
 
     private val preferences by lazy { getSharedPreferences("nexora", MODE_PRIVATE) }
     private val prompt: String
@@ -64,6 +89,10 @@ class MainActivity : Activity() {
             ?: filesDir
 
         buildInterface()
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7401)
+        }
         if (!preferences.getBoolean("ubuntu_profile_configured", false)) {
             showUbuntuSetup()
         } else {
@@ -114,6 +143,17 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFF151E30.toInt())
         }
         root.addView(status)
+
+        val folderButton = TextView(this).apply {
+            text = if (preferences.getString("android_tree_uri", null) == null)
+                "📁  CONNECT ANDROID FOLDER"
+            else "📁  ANDROID FOLDER CONNECTED  •  CHANGE"
+            textSize = 11f
+            setTextColor(0xFF7DD3FC.toInt())
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setOnClickListener { openAndroidFolderPicker() }
+        }
+        root.addView(folderButton)
 
         val promptRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -200,6 +240,54 @@ class MainActivity : Activity() {
         shortcutsScroll.addView(shortcuts)
         root.addView(shortcutsScroll)
         setContentView(root)
+    }
+
+    private fun openAndroidFolderPicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        startActivityForResult(intent, 7402)
+    }
+
+    @Deprecated("Use the Activity Result API in a future UI refactor")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 7402 && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            val flags = data.flags and
+                (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            contentResolver.takePersistableUriPermission(uri, flags)
+            preferences.edit()
+                .putString("android_tree_uri", uri.toString())
+                .remove("android_tree_imported_uri")
+                .apply()
+            appendLine("Android folder selected. Ubuntu will access it at /mnt/android.")
+            appendLine("Changes are synchronized after each command.")
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter().apply {
+            addAction(TerminalExecutionService.ACTION_OUTPUT)
+            addAction(TerminalExecutionService.ACTION_FINISHED)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(terminalReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(terminalReceiver, filter)
+        }
+        terminalReceiverRegistered = true
+    }
+
+    override fun onStop() {
+        if (terminalReceiverRegistered) {
+            unregisterReceiver(terminalReceiver)
+            terminalReceiverRegistered = false
+        }
+        super.onStop()
     }
 
     private fun showUbuntuSetup() {
@@ -345,15 +433,21 @@ class MainActivity : Activity() {
                     appendLine("Ubuntu runtime is not installed. Run install-ubuntu first.")
                 } else {
                     input.isEnabled = false
-                    ubuntuRuntime.execute(line, username, ubuntuUid, { result ->
-                        runOnUiThread { appendLine(result) }
-                    }) { code ->
-                        runOnUiThread {
-                            appendLine("[process exited with code $code]")
-                            input.isEnabled = true
-                            promptLabel.text = prompt
-                            input.requestFocus()
-                        }
+                    val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
+                        putExtra(TerminalExecutionService.EXTRA_COMMAND, line)
+                        putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
+                        putExtra(TerminalExecutionService.EXTRA_UID, ubuntuUid)
+                        putExtra(
+                            TerminalExecutionService.EXTRA_TREE_URI,
+                            preferences.getString("android_tree_uri", null)
+                        )
+                    }
+                    try {
+                        if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
+                        else startService(serviceIntent)
+                    } catch (error: Exception) {
+                        input.isEnabled = true
+                        appendLine("Could not start background command: ${error.message}")
                     }
                 }
             }
