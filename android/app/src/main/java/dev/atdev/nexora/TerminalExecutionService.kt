@@ -19,21 +19,41 @@ class TerminalExecutionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val installUbuntu = intent?.action == ACTION_INSTALL_UBUNTU
         val command = intent?.getStringExtra(EXTRA_COMMAND)
         val username = intent?.getStringExtra(EXTRA_USERNAME) ?: "user"
         val uid = intent?.getIntExtra(EXTRA_UID, 10000) ?: 10000
         val treeUri = intent?.getStringExtra(EXTRA_TREE_URI)?.let(Uri::parse)
-        if (command.isNullOrBlank()) {
+        if (!installUbuntu && command.isNullOrBlank()) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
         createNotificationChannel()
-        val notification = buildNotification("Running: $command", true)
+        val notification = buildNotification(
+            if (installUbuntu) "Installing Ubuntu 24.04…" else "Running: $command", true
+        )
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(notificationId, notification)
+        }
+
+        if (installUbuntu) {
+            val password = intent?.getStringExtra(EXTRA_INSTALL_PASSWORD)
+            if (password.isNullOrEmpty()) {
+                sendOutput("Ubuntu installer: password is missing.")
+                finishInstall(startId, false, "Password missing", -1)
+                return START_NOT_STICKY
+            }
+            sendOutput("Ubuntu installation running in background. You can switch apps.")
+            UbuntuRuntime(this).install(username, password, { message ->
+                sendOutput(message)
+                updateNotification(message)
+            }) { success, message, installedUid ->
+                finishInstall(startId, success, message, installedUid)
+            }
+            return START_NOT_STICKY
         }
 
         Thread {
@@ -66,6 +86,19 @@ class TerminalExecutionService : Service() {
             }
         }.start()
         return START_NOT_STICKY
+    }
+
+    private fun finishInstall(startId: Int, success: Boolean, message: String, uid: Int) {
+        sendBroadcast(Intent(ACTION_INSTALL_FINISHED).setPackage(packageName)
+            .putExtra(EXTRA_INSTALL_SUCCESS, success)
+            .putExtra(EXTRA_INSTALL_MESSAGE, message)
+            .putExtra(EXTRA_INSTALL_UID, uid))
+        getSystemService(NotificationManager::class.java).notify(
+            notificationId + 1,
+            buildNotification(if (success) "Ubuntu installed successfully" else "Ubuntu installation failed", false)
+        )
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
     }
 
     private fun finish(startId: Int, code: Int, treeUri: Uri?, bridge: AndroidFolderBridge) {
@@ -133,6 +166,12 @@ class TerminalExecutionService : Service() {
     }
 
     companion object {
+        const val ACTION_INSTALL_UBUNTU = "dev.atdev.nexora.INSTALL_UBUNTU"
+        const val ACTION_INSTALL_FINISHED = "dev.atdev.nexora.INSTALL_FINISHED"
+        const val EXTRA_INSTALL_PASSWORD = "install_password"
+        const val EXTRA_INSTALL_SUCCESS = "install_success"
+        const val EXTRA_INSTALL_MESSAGE = "install_message"
+        const val EXTRA_INSTALL_UID = "install_uid"
         const val EXTRA_COMMAND = "command"
         const val EXTRA_USERNAME = "username"
         const val EXTRA_UID = "uid"
