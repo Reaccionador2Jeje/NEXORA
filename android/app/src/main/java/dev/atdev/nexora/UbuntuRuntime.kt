@@ -28,6 +28,7 @@ class UbuntuRuntime(context: Context) {
             try {
                 base.mkdirs()
                 if (!proot.exists()) installProot(progress)
+                ensureProotExecutable()
                 if (!File(root, "bin/bash").exists()) installUbuntu(progress)
                 progress("Creating Ubuntu account…")
                 val create = rootCommand("if ! id -u '$user' >/dev/null 2>&1; then /usr/sbin/useradd -m -u 10000 -s /bin/bash '$user'; fi")
@@ -48,6 +49,7 @@ class UbuntuRuntime(context: Context) {
         Thread {
             var code = 1
             try {
+                ensureProotExecutable()
                 val elevated = command.trimStart().startsWith("sudo ")
                 val actual = if (elevated) command.trimStart().removePrefix("sudo ") else command
                 val args = mutableListOf(proot.absolutePath, "--link2symlink", "-r", root.absolutePath,
@@ -120,7 +122,7 @@ class UbuntuRuntime(context: Context) {
         val executable = if (proot.isFile) proot else binDir.walkTopDown().firstOrNull { it.isFile && it.name == "proot" }
         check(executable != null) { "PRoot binary missing from archive" }
         if (executable != proot) executable!!.copyTo(proot, true)
-        check(proot.setExecutable(true, true)) { "Cannot set PRoot executable permission" }
+        ensureProotExecutable()
     }
 
     private fun installUbuntu(progress: (String) -> Unit) {
@@ -204,12 +206,31 @@ class UbuntuRuntime(context: Context) {
     }
 
     private fun rootCommand(command: String, input: String = ""): Pair<Int, String> {
+        ensureProotExecutable()
         val p = ProcessBuilder(proot.absolutePath, "--link2symlink", "-0", "-r", root.absolutePath,
             "-b", "/dev", "-b", "/proc", "-b", "/sys", "/bin/bash", "-lc", command)
             .redirectErrorStream(true).start()
         if (input.isNotEmpty()) p.outputStream.bufferedWriter().use { it.write(input) } else p.outputStream.close()
         val output = p.inputStream.bufferedReader().readText()
         return p.waitFor() to output
+    }
+
+    /** Force explicit Unix execute bits and verify Android can see them. */
+    private fun ensureProotExecutable() {
+        check(proot.isFile && proot.length() > 0L) {
+            "PRoot binary is missing or empty: ${proot.absolutePath}"
+        }
+        try {
+            // 0755: owner can read/write/execute; group and others read/execute.
+            Os.chmod(proot.absolutePath, 493)
+        } catch (e: Exception) {
+            throw IllegalStateException("Cannot chmod PRoot: ${e.message}", e)
+        }
+        val mode = Os.stat(proot.absolutePath).st_mode
+        val executeBits = mode and 73 // 0111
+        check(executeBits != 0 && proot.canExecute()) {
+            "PRoot is not executable after chmod 0755 (mode=${mode.toString(8)}, path=${proot.absolutePath}). Android may be blocking execution from this storage location."
+        }
     }
 
     private fun fetchText(url: String): String {
