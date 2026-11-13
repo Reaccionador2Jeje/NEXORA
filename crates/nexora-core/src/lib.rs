@@ -10,14 +10,13 @@ pub enum Command {
     Version,
     Clear,
     Exit,
+    History,
+    Complete(String),
     Echo(Vec<String>),
     Pwd,
     List(Option<PathBuf>),
     ChangeDirectory(Option<PathBuf>),
-    External {
-        program: String,
-        args: Vec<String>,
-    },
+    External { program: String, args: Vec<String> },
 }
 
 /// Parse one prompt line into a command.
@@ -39,6 +38,18 @@ pub fn parse_command(input: &str) -> Result<Option<Command>, String> {
         "version" | "--version" | "-v" => Command::Version,
         "clear" | "cls" => Command::Clear,
         "exit" | "quit" => Command::Exit,
+        "history" | "hist" => {
+            if !rest.is_empty() {
+                return Err("usage: history".to_string());
+            }
+            Command::History
+        }
+        "complete" | "suggest" => {
+            if rest.len() > 1 {
+                return Err("usage: complete [prefix]".to_string());
+            }
+            Command::Complete(rest.first().cloned().unwrap_or_default())
+        }
         "echo" => Command::Echo(rest.to_vec()),
         "pwd" => Command::Pwd,
         "ls" | "dir" => {
@@ -123,6 +134,27 @@ mod tests {
     #[test]
     fn parses_builtin_command() {
         assert_eq!(parse_command("pwd").unwrap(), Some(Command::Pwd));
+    }
+
+    #[test]
+    fn parses_history() {
+        assert_eq!(parse_command("history").unwrap(), Some(Command::History));
+    }
+
+    #[test]
+    fn parses_completion_prefix() {
+        assert_eq!(
+            parse_command("complete pow").unwrap(),
+            Some(Command::Complete("pow".to_string()))
+        );
+    }
+
+    #[test]
+    fn parses_empty_completion_prefix() {
+        assert_eq!(
+            parse_command("complete").unwrap(),
+            Some(Command::Complete(String::new()))
+        );
     }
 
     #[test]
