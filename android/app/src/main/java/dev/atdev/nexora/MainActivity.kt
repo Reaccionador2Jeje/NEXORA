@@ -172,6 +172,38 @@ class MainActivity : Activity() {
         }
         root.addView(folderButton)
 
+        // Teclas auxiliares de terminal, situadas en la parte superior de la terminal.
+        val shortcutsScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            setPadding(0, dp(4), 0, dp(4))
+        }
+        val shortcuts = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "/", "-", "|", "~", "Ctrl+C")
+        keys.forEach { key ->
+            val keyView = TextView(this).apply {
+                text = key
+                textSize = 11f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                setTextColor(0xFFCBD5E1.toInt())
+                setPadding(dp(12), dp(9), dp(12), dp(9))
+                setBackgroundColor(0xFF1B2638.toInt())
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { handleShortcut(key) }
+            }
+            val params = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(36)
+            )
+            params.marginEnd = dp(5)
+            shortcuts.addView(keyView, params)
+        }
+        shortcutsScroll.addView(shortcuts)
+        root.addView(shortcutsScroll)
+
         val promptRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -225,37 +257,7 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
 
-        // Teclas auxiliares de terminal, situadas justo encima del prompt/teclado.
-        val shortcutsScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            setPadding(0, dp(4), 0, dp(4))
-        }
-        val shortcuts = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "/", "-", "|", "~", "Ctrl+C")
-        keys.forEach { key ->
-            val keyView = TextView(this).apply {
-                text = key
-                textSize = 11f
-                typeface = Typeface.MONOSPACE
-                gravity = Gravity.CENTER
-                setTextColor(0xFFCBD5E1.toInt())
-                setPadding(dp(12), dp(9), dp(12), dp(9))
-                setBackgroundColor(0xFF1B2638.toInt())
-                isClickable = true
-                isFocusable = true
-                setOnClickListener { handleShortcut(key) }
-            }
-            val params = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(36)
-            )
-            params.marginEnd = dp(5)
-            shortcuts.addView(keyView, params)
-        }
-        shortcutsScroll.addView(shortcuts)
-        root.addView(shortcutsScroll)
+
         setContentView(root)
     }
 
