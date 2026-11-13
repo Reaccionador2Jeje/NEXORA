@@ -72,12 +72,13 @@ class UbuntuRuntime(context: Context) {
     }
 
     private fun installProot(progress: (String) -> Unit) {
-        val arch = when (Build.SUPPORTED_ABIS.firstOrNull()) {
+        val abi = supportedAbi()
+        val arch = when (abi) {
             "arm64-v8a" -> "aarch64"
             "armeabi-v7a", "armeabi" -> "arm"
             "x86_64" -> "x86_64"
             "x86" -> "x86"
-            else -> error("Unsupported Android ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
+            else -> error("Unsupported Android ABI: $abi")
         }
         val release = JSONObject(fetchText("https://api.github.com/repos/ahmed-alnassif/proot/releases/latest"))
         val assets = release.getJSONArray("assets")
@@ -95,8 +96,11 @@ class UbuntuRuntime(context: Context) {
             "No verified PRoot release for $arch"
         }
         val zipFile = File(base, "proot.zip.part")
-        download(url!!, zipFile, progress)
-        check(sha256(zipFile).equals(digest, true)) { "PRoot SHA-256 verification failed" }
+        downloadResumable(url!!, zipFile, progress)
+        if (!sha256(zipFile).equals(digest, true)) {
+            zipFile.delete()
+            error("PRoot SHA-256 verification failed; the incomplete download was discarded")
+        }
         binDir.mkdirs()
         ZipInputStream(BufferedInputStream(FileInputStream(zipFile))).use { zip ->
             while (true) {
@@ -120,12 +124,13 @@ class UbuntuRuntime(context: Context) {
     }
 
     private fun installUbuntu(progress: (String) -> Unit) {
-        val arch = when (Build.SUPPORTED_ABIS.firstOrNull()) {
+        val abi = supportedAbi()
+        val arch = when (abi) {
             "arm64-v8a" -> "arm64"
             "armeabi-v7a", "armeabi" -> "armhf"
             "x86_64" -> "amd64"
             "x86" -> "i386"
-            else -> error("Unsupported Android ABI")
+            else -> error("Unsupported Android ABI: $abi")
         }
         val baseUrl = "https://cloud-images.ubuntu.com/minimal/releases/noble/release/"
         val name = "ubuntu-24.04-minimal-cloudimg-$arch-root.tar.xz"
@@ -136,8 +141,11 @@ class UbuntuRuntime(context: Context) {
             if (parts.size == 2 && parts[1].trimStart('*') == name) parts[0] else null
         }.firstOrNull() ?: error("Ubuntu checksum list does not contain $name")
         val archive = File(base, "$name.part")
-        download(baseUrl + name, archive, progress)
-        check(sha256(archive).equals(expected, true)) { "Ubuntu rootfs SHA-256 verification failed" }
+        downloadResumable(baseUrl + name, archive, progress)
+        if (!sha256(archive).equals(expected, true)) {
+            archive.delete()
+            error("Ubuntu rootfs SHA-256 verification failed; the incomplete download was discarded")
+        }
         val stage = File(base, "rootfs-staging")
         stage.deleteRecursively()
         stage.mkdirs()
@@ -187,8 +195,10 @@ class UbuntuRuntime(context: Context) {
             check(File(stage, "bin/bash").isFile) { "Ubuntu extraction incomplete: bash missing" }
             root.deleteRecursively()
             check(stage.renameTo(root)) { "Could not finalize Ubuntu rootfs" }
-        } finally {
             archive.delete()
+        } finally {
+            // Keep a checksum-verified archive after extraction errors so retrying
+            // does not force the user to download the entire Ubuntu image again.
             stage.deleteRecursively()
         }
     }
@@ -210,27 +220,79 @@ class UbuntuRuntime(context: Context) {
         return try { c.inputStream.bufferedReader().use { it.readText() } } finally { c.disconnect() }
     }
 
-    private fun download(url: String, file: File, progress: (String) -> Unit) {
-        val c = URL(url).openConnection() as HttpURLConnection
-        c.connectTimeout = 20000
-        c.readTimeout = 60000
-        c.setRequestProperty("User-Agent", "NEXORA-Android")
+    /**
+     * Chooses the first ABI this runtime actually supports, not blindly the
+     * first ABI reported by Android.
+     */
+    private fun supportedAbi(): String =
+        Build.SUPPORTED_ABIS.firstOrNull {
+            it in setOf("arm64-v8a", "armeabi-v7a", "armeabi", "x86_64", "x86")
+        } ?: error("Unsupported device architecture: ${Build.SUPPORTED_ABIS.joinToString()}")
+
+    /**
+     * Resumable download. If the app closes or the network drops, the .part
+     * file remains and the next install continues with HTTP Range when possible.
+     */
+    private fun downloadResumable(url: String, file: File, progress: (String) -> Unit) {
+        file.parentFile?.mkdirs()
+        var offset = file.takeIf { it.isFile }?.length() ?: 0L
+        var connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 20000
+        connection.readTimeout = 60000
+        connection.setRequestProperty("User-Agent", "NEXORA-Android")
+        if (offset > 0L) connection.setRequestProperty("Range", "bytes=$offset-")
+
         try {
-            c.inputStream.use { input ->
-                FileOutputStream(file).use { output ->
-                    val buffer = ByteArray(65536)
-                    var total = 0L
+            var status = connection.responseCode
+            if (status == 416 && offset > 0L) {
+                connection.disconnect()
+                file.delete()
+                offset = 0L
+                connection = URL(url).openConnection() as HttpURLConnection
+                connection.connectTimeout = 20000
+                connection.readTimeout = 60000
+                connection.setRequestProperty("User-Agent", "NEXORA-Android")
+                status = connection.responseCode
+            }
+
+            val append = offset > 0L && status == HttpURLConnection.HTTP_PARTIAL
+            if (status !in 200..299) error("Download failed: HTTP $status")
+            if (append) {
+                val range = connection.getHeaderField("Content-Range").orEmpty()
+                check(range.startsWith("bytes $offset-")) {
+                    "Download server returned an invalid resume range"
+                }
+            } else if (offset > 0L) {
+                file.delete()
+                offset = 0L
+            }
+
+            val expectedTotal = connection.getHeaderFieldLong("Content-Length", -1L)
+                .let { if (it >= 0L) it + offset else -1L }
+            connection.inputStream.use { input ->
+                FileOutputStream(file, append).use { output ->
+                    val buffer = ByteArray(128 * 1024)
+                    var received = offset
+                    var lastReported = -1L
                     while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        output.write(buffer, 0, n)
-                        total += n
-                        if (total % (4L * 1024 * 1024) < buffer.size)
-                            progress("Downloaded ${total / (1024 * 1024)} MB…")
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        received += count
+                        val megabytes = received / (8L * 1024 * 1024)
+                        if (megabytes != lastReported) {
+                            lastReported = megabytes
+                            val totalText = if (expectedTotal > 0L)
+                                " / ${expectedTotal / (1024 * 1024)} MB" else ""
+                            progress("Downloaded ${received / (1024 * 1024)}$totalText MB…")
+                        }
                     }
+                    output.fd.sync()
                 }
             }
-        } finally { c.disconnect() }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun sha256(file: File): String {
