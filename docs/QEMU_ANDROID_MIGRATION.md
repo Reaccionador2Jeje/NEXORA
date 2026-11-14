@@ -38,9 +38,9 @@ The QEMU engine needs its own:
 
 ### Stage 2 — build and verify the Android QEMU runtime
 
-The repository now has a dedicated manual/paths-triggered workflow at `.github/workflows/build-qemu-android.yml`. It uses the Termux Android/Bionic package build environment to compile the headless QEMU package for AArch64, stages the `qemu-system-aarch64` executable and its non-platform shared-library dependencies, and verifies the ELF architecture and Bionic linker path.
+NEXORA must not depend on Termux at build time or runtime. The QEMU workflow is being migrated to an official standalone Android NDK toolchain and upstream QEMU sources. It must produce an Android/Bionic `arm64-v8a` executable and bundle only the shared libraries built for NEXORA. No Termux package builder, Termux prefix, or Termux runtime files may enter the APK.
 
-The staged output is currently a **candidate artifact only**. It is not yet copied into the production APK or selected by `LinuxRuntimeFactory`. Build success alone does not prove that Android can execute it; device validation is still required.
+The current standalone workflow validates the official NDK and pins an upstream QEMU source release, but it does **not yet compile QEMU**. The next build step must cross-compile QEMU and its required dependencies for Android. No QEMU runtime artifact is considered ready until the binary, dependency closure, and physical-device execution are verified.
 
 - Produce a reproducible `arm64-v8a` QEMU System build for Android/Bionic.
 - Package all required shared libraries and verify the executable's ELF interpreter and dependencies in CI.
