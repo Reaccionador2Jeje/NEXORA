@@ -29,7 +29,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          NDK_VERSION="30.0.149434ಣ"
           NDK_ARCHIVE="android-ndk-r30-linux.zip"
           NDK_SHA256="753611f410d002cfcd3f3dc2ef49aad532089d3180b436c060a90bf0fcb64df2"
           mkdir -p "$RUNNER_TEMP/android"
