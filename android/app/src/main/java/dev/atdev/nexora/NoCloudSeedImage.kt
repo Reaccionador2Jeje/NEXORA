@@ -47,8 +47,9 @@ object NoCloudSeedImage {
 
         val userBytes = userData.toByteArray(StandardCharsets.UTF_8)
         val metaBytes = metaData.toByteArray(StandardCharsets.UTF_8)
-        require(userBytes.size <= SECTOR_SIZE && metaBytes.size <= SECTOR_SIZE) {
-            "NEXORA cloud-init seed files exceed the FAT12 single-cluster limit."
+        val availableDataBytes = (TOTAL_SECTORS - DATA_START_SECTOR) * SECTOR_SIZE
+        require(userBytes.size.toLong() + metaBytes.size.toLong() <= availableDataBytes.toLong()) {
+            "NEXORA cloud-init seed files exceed the FAT12 image capacity."
         }
 
         val image = ByteArray(TOTAL_SECTORS * SECTOR_SIZE)
