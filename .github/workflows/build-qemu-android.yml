@@ -80,7 +80,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/nexora-qemu/src"
           mv qemu-src "$RUNNER_TEMP/nexora-qemu/src/qemu"
           QEMU_WORK_DIR="$RUNNER_TEMP/nexora-qemu" \
-            BUILD_JOBS=2 scripts/build-qemu-android.sh
+            BUILD_JOBS=2 bash scripts/build-qemu-android.sh
 
       - name: Upload standalone QEMU ARM64 candidate
         uses: actions/upload-artifact@v4
