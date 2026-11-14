@@ -51,7 +51,6 @@ mkdir -p "$BUILD/libffi"
 cd "$BUILD/libffi"
 "$SRC/libffi/configure" \
   --host=aarch64-linux-android \
-  --prefix="$PREFIX" \
   --disable-shared --enable-static --with-pic \
   CC="$CC" AR="$AR" RANLIB="$RANLIB" \
   CFLAGS="$CFLAGS"
@@ -126,7 +125,7 @@ mkdir -p "$QEMU_BUILD"
   --cc="$CC" --cxx="$CXX" --host-cc=cc \
   --extra-cflags="-O2 -fPIC -I$PREFIX/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-rpath-link,$PREFIX/lib" \
-  --disable-docs --disable-werror \
+  --disable-docs -Dwerror=false \
   -Dtools=disabled -Dguest_agent=disabled \
   -Dgtk=disabled -Dsdl=disabled -Dvnc=disabled -Dslirp=disabled \
   -Dcapstone=disabled -Dcurl=disabled -Dlibnfs=disabled \
