@@ -15,6 +15,10 @@ permissions:
   actions: read
   contents: read
 
+concurrency:
+  group: nexora-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: Validate and build on ${{ matrix.os }}
