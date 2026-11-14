@@ -42,7 +42,7 @@ echo "==> Fetching pinned Android dependency sources"
 clone_tag https://github.com/libffi/libffi.git v3.4.8 libffi
 clone_tag https://github.com/PCRE2Project/pcre2.git pcre2-10.45 pcre2
 clone_tag https://github.com/GNOME/glib.git 2.84.4 glib
-clone_tag https://github.com/pixman/pixman.git pixman-0.46.4 pixman
+clone_tag https://gitlab.freedesktop.org/pixman/pixman.git pixman-0.46.4 pixman
 
 echo "==> Building libffi for Android"
 cd "$SRC/libffi"
@@ -104,8 +104,8 @@ echo "==> Building Pixman for Android"
 meson setup "$BUILD/pixman" "$SRC/pixman" \
   --cross-file "$WORK/android-aarch64.ini" \
   --prefix "$PREFIX" --buildtype release --default-library static \
-  -Dtests=disabled -Ddemos=disabled -Dgtk=disabled \
-  -Dlibpng=disabled -Dopenmp=disabled
+  -Dtests=false -Ddemos=false -Dgtk=false \
+  -Dlibpng=false -Dopenmp=false
 meson compile -C "$BUILD/pixman" --jobs "$JOBS"
 meson install -C "$BUILD/pixman"
 
