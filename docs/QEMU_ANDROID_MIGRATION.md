@@ -2,9 +2,9 @@
 
 ## Decision
 
-NEXORA is moving from a PRoot-based Ubuntu userspace toward a full ARM64 virtual machine powered by **QEMU System Emulation**.
+NEXORA's Android Linux runtime is **QEMU System Emulation**, booting a full ARM64 Ubuntu virtual machine.
 
-This is a staged migration. The current PRoot implementation remains isolated as a fallback until the QEMU engine has passed real-device boot and command tests. The app must not silently switch users to an unbootable or incomplete VM.
+QEMU is now the selected Android runtime. PRoot is no longer packaged or used by the Android installer. The APK build is gated on a successful standalone QEMU build and verified runtime artifact; physical-device boot and persistence acceptance testing remains outstanding.
 
 ## Target architecture
 
@@ -33,7 +33,7 @@ The QEMU engine needs its own:
 
 ### Stage 1 — isolate the engine boundary
 - Define one Android runtime contract for status, installation/provisioning, start, command input, and stop.
-- Keep PRoot behind a legacy adapter; UI and service code must stop depending directly on PRoot implementation details.
+- Keep the runtime boundary independent of the terminal UI and service; do not reintroduce PRoot as an alternate Android installer.
 - Add QEMU architecture documentation and CI checks before changing the active engine.
 
 ### Stage 2 — build and verify the Android QEMU runtime
@@ -51,21 +51,21 @@ The standalone workflow pins QEMU v10.1.2, uses the official Android NDK r30, an
 - Boot a disposable test guest with serial output.
 - Verify guest kernel startup, virtual block storage, shutdown, and restart.
 - Measure memory use and startup time on a physical Android ARM64 device.
-- No user data migration or PRoot removal at this stage.
+- No automatic migration or deletion of any pre-existing app data.
 
 ### Stage 4 — Ubuntu 24.04 VM
 - Download the official Ubuntu 24.04 LTS ARM64 cloud image and verify it against Canonical's published `SHA256SUMS` before activation.
 - Bundle the matching AAVMF UEFI code and variable-store templates from Ubuntu's `qemu-efi-aarch64` package; keep a writable private copy of the variable store for the VM.
 - Generate a small FAT12 NoCloud seed disk with the `CIDATA` volume label. It provisions the selected Linux user and enables serial-console auto-login on first boot without requiring a network service.
-- Keep the QCOW2 disk, seed disk, and writable UEFI variables in app-private storage. Never overwrite the legacy PRoot rootfs.
+- Keep the QCOW2 disk, seed disk, and writable UEFI variables in app-private storage. Keep the new VM disk separate from any legacy rootfs data.
 - Add network access only after the offline boot path is reliable. The current QEMU build intentionally disables SLIRP, so guest networking is not yet available.
 - The app exposes `qemu-install`, `qemu-start`, `qemu-stop`, `qemu-status`, and `qemu-check`. `qemu-check` tests the Android executable/linker; `qemu-install` prepares the guest image; `qemu-start` boots it. These are separate stages and must not be confused with proof of successful Ubuntu boot.
 
-### Stage 5 — terminal integration and cutover
-- Connect NEXORA's terminal UI to the guest serial console using the new process/serial controller, including login provisioning and exit-status framing.
-- Keep one persistent shell session so `cd`, shell variables, jobs, and interactive programs behave naturally.
-- Add graceful stop/recovery and disk-space diagnostics.
-- Make QEMU the default only after real-device acceptance tests pass. Remove PRoot only in a later cleanup release.
+### Stage 5 — terminal integration and device acceptance
+- The terminal UI now sends input to and displays output from the QEMU serial console.
+- The VM disk and writable UEFI variables persist in app-private storage across normal VM stops.
+- Verify login provisioning, repeated boots, shell state, graceful stop/recovery, and disk-space diagnostics on physical ARM64 Android devices.
+- Add guest networking and file-sharing only after the offline boot path is reliable.
 
 ## Acceptance criteria
 
@@ -80,7 +80,7 @@ The QEMU engine is not considered ready because the APK merely compiles. It must
 
 ## Constraints and user-data safety
 
-- Do not delete the existing Ubuntu/PRoot data during migration.
+- Do not automatically delete any pre-existing Ubuntu/PRoot data left by older app versions.
 - Do not automatically convert or overwrite the old rootfs.
 - Keep the VM disk in app-private storage; a user-selected shared folder can be added later as an explicit file-transfer feature.
 - A full-system emulator can be significantly slower and more memory-intensive than a userspace environment. Performance must be measured on target devices before promising support.
