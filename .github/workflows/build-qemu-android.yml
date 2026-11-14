@@ -8,6 +8,7 @@ on:
       - ".github/workflows/build-qemu-android.yml"
       - "scripts/package-qemu-android.py"
       - "scripts/build-qemu-android.sh"
+      - "scripts/smoke-test-ubuntu-arm64.sh"
       - "docs/QEMU_ANDROID_MIGRATION.md"
 
 permissions:
