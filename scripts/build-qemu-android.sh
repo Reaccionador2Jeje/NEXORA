@@ -132,8 +132,8 @@ mkdir -p "$QEMU_BUILD"
   -Dcapstone=disabled -Dcurl=disabled -Dlibnfs=disabled \
   -Dspice=disabled -Dusb_redir=disabled -Dlibusb=disabled \
   -Dopengl=disabled -Dvirglrenderer=disabled -Dkvm=disabled \
-  -Dtcg=enabled -Daudio_drv_list=[] \
-  --with-pkgversion="NEXORA Android ARM64"
+  -Dtcg=enabled -Dpixman=enabled -Dfdt=internal \\
+  -Daudio_drv_list=[] -Dpkgversion=NEXORA-Android-ARM64
 
 echo "==> Compiling QEMU"
 ninja -C "$QEMU_BUILD" -j"$JOBS" qemu-system-aarch64
