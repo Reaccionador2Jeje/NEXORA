@@ -153,11 +153,15 @@ PKG_CONFIG_PATH="$PKG_CONFIG_PATH" pkg-config --modversion libpcre2-8
 echo "==> Configuring upstream QEMU for Android"
 QEMU_SOURCE="$WORK/src/qemu"
 QEMU_BUILD="$BUILD/qemu"
-mkdir -p "$QEMU_BUILD"
+# QEMU's Meson cross file expects a target-prefixed nm executable. The
+# Android NDK ships llvm-nm instead, so provide the conventional alias.
+CROSS_TOOLS="$WORK/cross-tools"
+mkdir -p "$QEMU_BUILD" "$CROSS_TOOLS"
+ln -sf "$TOOLCHAIN/llvm-nm" "$CROSS_TOOLS/aarch64-linux-android-nm"
 cd "$QEMU_BUILD"
 "$QEMU_SOURCE/configure" \
   --target-list=aarch64-softmmu \
-  --cross-prefix="$TOOLCHAIN/aarch64-linux-android-" \
+  --cross-prefix="$CROSS_TOOLS/aarch64-linux-android-" \
   --cc="$CC" --cxx="$CXX" --host-cc=cc \
   --extra-cflags="-O2 -fPIC -I$PREFIX/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-rpath-link,$PREFIX/lib" \
