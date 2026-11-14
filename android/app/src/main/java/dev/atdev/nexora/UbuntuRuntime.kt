@@ -21,7 +21,28 @@ class UbuntuRuntime(context: Context) {
     // Android permits execution of APK-extracted native libraries; writable filesDir may be mounted noexec.
     private val proot = File(app.applicationInfo.nativeLibraryDir, "libproot.so")
 
-    fun isInstalled() = proot.canExecute() && File(root, "bin/bash").isFile
+    fun isInstalled(): Boolean =
+        proot.canExecute() && isRootfsExecutable()
+
+    private fun isRootfsExecutable(): Boolean {
+        val bash = File(root, "usr/bin/bash")
+        if (!bash.isFile || !bash.canExecute()) return false
+        return try {
+            (Os.stat(bash.absolutePath).st_mode and 0x49) != 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun validateRootfs() {
+        val bash = File(root, "usr/bin/bash")
+        check(bash.isFile) { "Ubuntu rootfs is incomplete: /usr/bin/bash is missing" }
+        val mode = Os.stat(bash.absolutePath).st_mode
+        check((mode and 0x49) != 0 && bash.canExecute()) {
+            "Ubuntu bash is not executable (mode=${mode.toString(8)}). The rootfs must be repaired."
+        }
+        check(File(root, "usr/bin/env").isFile) { "Ubuntu rootfs is incomplete: /usr/bin/env is missing" }
+    }
 
     fun install(user: String, password: String, progress: (String) -> Unit, done: (Boolean, String, Int) -> Unit) {
         Thread {
@@ -29,7 +50,11 @@ class UbuntuRuntime(context: Context) {
                 base.mkdirs()
                 installProot(progress)
                 ensureProotExecutable()
-                if (!File(root, "bin/bash").exists()) installUbuntu(progress)
+                if (!isRootfsExecutable()) {
+                    progress("Ubuntu rootfs is missing executable permissions; rebuilding it…")
+                    installUbuntu(progress)
+                }
+                validateRootfs()
                 progress("Creating Ubuntu account…")
                 val create = rootCommand("if ! id -u '$user' >/dev/null 2>&1; then /usr/sbin/useradd -m -u 10000 -s /bin/bash '$user'; fi")
                 check(create.first == 0) { "useradd failed: ${create.second}" }
@@ -57,6 +82,7 @@ class UbuntuRuntime(context: Context) {
             var code = 1
             try {
                 ensureProotExecutable()
+                validateRootfs()
                 val elevated = command.trimStart().startsWith("sudo ")
                 val actual = if (elevated) command.trimStart().removePrefix("sudo ") else command
                 val args = mutableListOf(proot.absolutePath, "--link2symlink", "-r", root.absolutePath,
@@ -128,7 +154,10 @@ class UbuntuRuntime(context: Context) {
                         "Unsafe path in Ubuntu rootfs"
                     }
                     when {
-                        e.isDirectory -> target.mkdirs()
+                        e.isDirectory -> {
+                            target.mkdirs()
+                            Os.chmod(target.absolutePath, e.mode and 0xFFF)
+                        }
                         e.isSymbolicLink -> { target.parentFile?.mkdirs(); Os.symlink(e.linkName, target.absolutePath) }
                         e.isLink -> {
                             target.parentFile?.mkdirs()
@@ -144,22 +173,24 @@ class UbuntuRuntime(context: Context) {
                                 Os.link(source.absolutePath, target.absolutePath)
                             } catch (_: Exception) {
                                 source.copyTo(target, overwrite = true)
-                                target.setReadable(source.canRead(), false)
-                                target.setWritable(source.canWrite(), false)
-                                target.setExecutable(source.canExecute(), false)
                             }
+                            Os.chmod(target.absolutePath, e.mode and 0xFFF)
                         }
                         e.isFile -> {
                             target.parentFile?.mkdirs()
                             FileOutputStream(target).use { tar.copyTo(it) }
-                            target.setReadable((e.mode and 292) != 0, false)
-                            target.setWritable((e.mode and 146) != 0, false)
-                            target.setExecutable((e.mode and 73) != 0, false)
+                            // Preserve the exact Unix permission bits from the tar archive.
+                            // File.setExecutable() can silently fail and does not report which
+                            // permission bits were actually applied.
+                            Os.chmod(target.absolutePath, e.mode and 0xFFF)
                         }
                     }
                 }
             }
             check(File(stage, "bin/bash").isFile) { "Ubuntu extraction incomplete: bash missing" }
+            check(File(stage, "usr/bin/bash").canExecute()) {
+                "Ubuntu extraction produced a non-executable bash binary"
+            }
             root.deleteRecursively()
             check(stage.renameTo(root)) { "Could not finalize Ubuntu rootfs" }
             archive.delete()
@@ -172,9 +203,7 @@ class UbuntuRuntime(context: Context) {
 
     private fun rootCommand(command: String, input: String = ""): Pair<Int, String> {
         ensureProotExecutable()
-        check(File(root, "bin/bash").isFile) {
-            "Ubuntu rootfs is incomplete: /bin/bash is missing. Repair or reinstall Ubuntu before creating the account."
-        }
+        validateRootfs()
         val builder = ProcessBuilder(proot.absolutePath, "--link2symlink", "-0", "-r", root.absolutePath,
             "-b", "/dev", "-b", "/proc", "-b", "/sys", "/bin/bash", "-lc", command)
             .redirectErrorStream(true)
