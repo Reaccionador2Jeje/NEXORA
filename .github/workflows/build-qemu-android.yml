@@ -38,10 +38,13 @@ jobs:
           NDK_SHA1="5107f898313790e449e87eee2183d9a20602dee9"
           mkdir -p "$RUNNER_TEMP/android"
           cd "$RUNNER_TEMP/android"
-          curl --fail --location --retry 3             "https://dl.google.com/android/repository/$NDK_ARCHIVE"             -o "$NDK_ARCHIVE"
+          curl --fail --location --retry 3 \
+            "https://dl.google.com/android/repository/$NDK_ARCHIVE" \
+            -o "$NDK_ARCHIVE"
           echo "$NDK_SHA1  $NDK_ARCHIVE" | sha1sum --check -
           unzip -q "$NDK_ARCHIVE"
           echo "ANDROID_NDK_HOME=$RUNNER_TEMP/android/android-ndk-r30" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_VERSION=$NDK_VERSION" >> "$GITHUB_ENV"
           test -x "$RUNNER_TEMP/android/android-ndk-r30/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
 
       - name: Fetch upstream QEMU source
@@ -65,7 +68,7 @@ jobs:
             echo "Build model: standalone Android NDK; no Termux runtime or package builder"
             echo "Android ABI: arm64-v8a"
             echo "Android API: 24"
-            echo "Android NDK: $NDK_VERSION"
+            echo "Android NDK: $ANDROID_NDK_VERSION"
             echo "QEMU source: $(git -C qemu-src describe --tags --always)"
             echo "QEMU commit: $(cat qemu-src/UPSTREAM_COMMIT.txt)"
           } | tee qemu-src/NEXORA_ANDROID_BUILD_INFO.txt
