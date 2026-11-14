@@ -135,9 +135,12 @@ jobs:
           set -euo pipefail
           test -x /tmp/nexora-qemu-android-arm64/qemu-system-aarch64
           mkdir -p app/src/main/assets/qemu/arm64-v8a
-          cp -a /tmp/nexora-qemu-android-arm64/. app/src/main/assets/qemu/arm64-v8a/
-          chmod 0755 app/src/main/assets/qemu/arm64-v8a/qemu-system-aarch64
+          install -m 0755 /tmp/nexora-qemu-android-arm64/qemu-system-aarch64 app/src/main/assets/qemu/arm64-v8a/
+          find /tmp/nexora-qemu-android-arm64 -maxdepth 1 -type f -name '*.so*' \
+            -exec install -m 0644 {} app/src/main/assets/qemu/arm64-v8a/ \\;
+          install -m 0644 /tmp/nexora-qemu-android-arm64/SHA256SUMS app/src/main/assets/qemu/arm64-v8a/
           test -s app/src/main/assets/qemu/arm64-v8a/qemu-system-aarch64
+          test -s app/src/main/assets/qemu/arm64-v8a/SHA256SUMS
 
       - name: Build Android debug APK
         working-directory: android
