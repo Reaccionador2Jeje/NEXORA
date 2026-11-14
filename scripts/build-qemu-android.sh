@@ -201,4 +201,10 @@ for project in qemu libffi libiconv pcre2 glib pixman; do
 done
 git -C "$WORK/src/qemu" rev-parse HEAD > "$ROOT/artifacts/qemu-android-arm64/QEMU_COMMIT.txt"
 printf 'NDK=r30\nAPI=%s\nABI=arm64-v8a\n' "$API" > "$ROOT/artifacts/qemu-android-arm64/BUILD_INFO.txt"
+(
+  cd "$ROOT/artifacts/qemu-android-arm64"
+  find . -maxdepth 1 -type f \\( -name 'qemu-system-aarch64' -o -name '*.so*' \\) -print0 |
+    sort -z | xargs -0 sha256sum
+) > "$ROOT/artifacts/qemu-android-arm64/SHA256SUMS"
+
 echo "QEMU Android ARM64 candidate built and staged."
