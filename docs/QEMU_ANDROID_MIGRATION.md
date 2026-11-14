@@ -37,6 +37,11 @@ The QEMU engine needs its own:
 - Add QEMU architecture documentation and CI checks before changing the active engine.
 
 ### Stage 2 — build and verify the Android QEMU runtime
+
+The repository now has a dedicated manual/paths-triggered workflow at `.github/workflows/build-qemu-android.yml`. It uses the Termux Android/Bionic package build environment to compile the headless QEMU package for AArch64, stages the `qemu-system-aarch64` executable and its non-platform shared-library dependencies, and verifies the ELF architecture and Bionic linker path.
+
+The staged output is currently a **candidate artifact only**. It is not yet copied into the production APK or selected by `LinuxRuntimeFactory`. Build success alone does not prove that Android can execute it; device validation is still required.
+
 - Produce a reproducible `arm64-v8a` QEMU System build for Android/Bionic.
 - Package all required shared libraries and verify the executable's ELF interpreter and dependencies in CI.
 - Confirm that the emulator starts on a real Android device and accepts a serial console.
