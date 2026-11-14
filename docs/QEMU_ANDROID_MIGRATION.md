@@ -54,10 +54,12 @@ The standalone workflow pins QEMU v10.1.2, uses the official Android NDK r30, an
 - No user data migration or PRoot removal at this stage.
 
 ### Stage 4 — Ubuntu 24.04 VM
-- Create or obtain a bootable Ubuntu 24.04 ARM64 disk image with a compatible boot path.
-- Provision the first user through cloud-init or a controlled first-boot setup, not by executing host-side `useradd`.
-- Persist the VM disk between app launches.
-- Add network access only after the offline boot path is reliable.
+- Download the official Ubuntu 24.04 LTS ARM64 cloud image and verify it against Canonical's published `SHA256SUMS` before activation.
+- Bundle the matching AAVMF UEFI code and variable-store templates from Ubuntu's `qemu-efi-aarch64` package; keep a writable private copy of the variable store for the VM.
+- Generate a small FAT12 NoCloud seed disk with the `CIDATA` volume label. It provisions the selected Linux user and enables serial-console auto-login on first boot without requiring a network service.
+- Keep the QCOW2 disk, seed disk, and writable UEFI variables in app-private storage. Never overwrite the legacy PRoot rootfs.
+- Add network access only after the offline boot path is reliable. The current QEMU build intentionally disables SLIRP, so guest networking is not yet available.
+- The app exposes `qemu-install`, `qemu-start`, `qemu-stop`, `qemu-status`, and `qemu-check`. `qemu-check` tests the Android executable/linker; `qemu-install` prepares the guest image; `qemu-start` boots it. These are separate stages and must not be confused with proof of successful Ubuntu boot.
 
 ### Stage 5 — terminal integration and cutover
 - Connect NEXORA's terminal UI to the guest serial console using the new process/serial controller, including login provisioning and exit-status framing.
@@ -71,7 +73,7 @@ The QEMU engine is not considered ready because the APK merely compiles. It must
 
 - QEMU binary starts without missing-library or linker errors.
 - Guest kernel reaches a login prompt through the serial console.
-- Ubuntu 24.04 ARM64 boots repeatedly from the persistent disk.
+- Ubuntu 24.04 ARM64 boots repeatedly from the persistent disk and discovers the NoCloud seed on first boot.
 - A normal user can run commands, use `cd`, and retain files after VM restart.
 - App stop/restart does not corrupt the virtual disk.
 - Unsupported acceleration or insufficient resources produce actionable messages, not generic `Permission denied` errors.
