@@ -36,7 +36,7 @@ object NoCloudSeedImage {
                 content: |
                   [Service]
                   ExecStart=
-                  ExecStart=-/sbin/agetty --autologin $username --noclear %I $TERM
+                  ExecStart=-/sbin/agetty --autologin $username --noclear %I ${'$'}TERM
             runcmd:
               - [systemctl, daemon-reload]
               - [systemctl, enable, serial-getty@ttyAMA0.service]
