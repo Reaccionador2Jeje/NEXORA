@@ -24,6 +24,7 @@ class QemuVmController(
         diskImage: File,
         firmwareCode: File,
         firmwareVars: File,
+        seedImage: File? = null,
         memoryMb: Int = 1024,
         cpuCount: Int = 2,
         onOutput: (String) -> Unit,
@@ -34,10 +35,13 @@ class QemuVmController(
             require(diskImage.isFile && diskImage.canRead()) { "Ubuntu virtual disk is missing or unreadable." }
             require(firmwareCode.isFile && firmwareCode.canRead()) { "ARM64 UEFI firmware code is missing." }
             require(firmwareVars.isFile && firmwareVars.canRead()) { "Writable UEFI variables image is missing." }
+            require(seedImage == null || (seedImage.isFile && seedImage.canRead())) {
+                "The cloud-init seed disk is missing or unreadable."
+            }
             require(memoryMb in 512..4096) { "VM memory must be between 512 and 4096 MB." }
             require(cpuCount in 1..4) { "VM CPU count must be between 1 and 4." }
 
-            val command = listOf(
+            val command = mutableListOf(
                 qemu.executable.absolutePath,
                 "-machine", "virt",
                 "-cpu", "cortex-a72",
@@ -52,6 +56,12 @@ class QemuVmController(
                 "-monitor", "none",
                 "-no-reboot"
             )
+            if (seedImage != null) {
+                command.addAll(listOf(
+                    "-drive", "if=none,id=seed,format=raw,file=${seedImage.absolutePath}",
+                    "-device", "virtio-blk-device,drive=seed"
+                ))
+            }
             val child = ProcessBuilder(command)
                 .redirectErrorStream(true)
                 .apply {
