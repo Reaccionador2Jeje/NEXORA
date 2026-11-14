@@ -70,7 +70,9 @@ class UbuntuRuntime(context: Context) {
                 args.addAll(listOf("/usr/bin/env", "HOME=/home/$user", "USER=$user", "LOGNAME=$user",
                     "TERM=xterm-256color", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
                     "/bin/bash", "--noprofile", "--norc", "-lc", actual))
-                val p = ProcessBuilder(args).redirectErrorStream(true).start()
+                val builder = ProcessBuilder(args).redirectErrorStream(true)
+                configureProotTemp(builder)
+                val p = builder.start()
                 p.inputStream.bufferedReader().useLines { seq -> seq.forEach(line) }
                 code = p.waitFor()
             } catch (e: Exception) {
@@ -170,12 +172,29 @@ class UbuntuRuntime(context: Context) {
 
     private fun rootCommand(command: String, input: String = ""): Pair<Int, String> {
         ensureProotExecutable()
-        val p = ProcessBuilder(proot.absolutePath, "--link2symlink", "-0", "-r", root.absolutePath,
+        check(File(root, "bin/bash").isFile) {
+            "Ubuntu rootfs is incomplete: /bin/bash is missing. Repair or reinstall Ubuntu before creating the account."
+        }
+        val builder = ProcessBuilder(proot.absolutePath, "--link2symlink", "-0", "-r", root.absolutePath,
             "-b", "/dev", "-b", "/proc", "-b", "/sys", "/bin/bash", "-lc", command)
-            .redirectErrorStream(true).start()
+            .redirectErrorStream(true)
+        configureProotTemp(builder)
+        val p = builder.start()
         if (input.isNotEmpty()) p.outputStream.bufferedWriter().use { it.write(input) } else p.outputStream.close()
         val output = p.inputStream.bufferedReader().readText()
         return p.waitFor() to output
+    }
+
+    /**
+     * Keep PRoot's host-side temporary files inside NEXORA's writable sandbox.
+     * The default temp location may be inaccessible on some Android filesystems.
+     */
+    private fun configureProotTemp(builder: ProcessBuilder) {
+        val tempDir = File(base, "proot-tmp")
+        check((tempDir.isDirectory || tempDir.mkdirs()) && tempDir.canWrite()) {
+            "Cannot create writable PRoot temporary directory: ${tempDir.absolutePath}"
+        }
+        builder.environment()["PROOT_TMP_DIR"] = tempDir.absolutePath
     }
 
     /**
