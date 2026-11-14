@@ -55,7 +55,7 @@ jobs:
           unzip -q "$NDK_ARCHIVE"
           echo "ANDROID_NDK_HOME=$RUNNER_TEMP/android/android-ndk-r30" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_VERSION=$NDK_VERSION" >> "$GITHUB_ENV"
-          test -x "$RUNNER_TEMP/android/android-ndk-r30/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          test -x "$RUNNER_TEMP/android/android-ndk-r30/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
 
       - name: Fetch upstream QEMU source
         run: |
@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang" --version
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" --version
           test -f qemu-src/configure
           test -f qemu-src/meson.build
           bash -n scripts/build-qemu-android.sh
@@ -79,7 +79,7 @@ jobs:
           {
             echo "Build model: standalone Android NDK; no Termux runtime or package builder"
             echo "Android ABI: arm64-v8a"
-            echo "Android API: 24"
+            echo "Android API: 26"
             echo "Android NDK: $ANDROID_NDK_VERSION"
             echo "QEMU source: $(git -C qemu-src describe --tags --always)"
             echo "QEMU commit: $(cat qemu-src/UPSTREAM_COMMIT.txt)"
