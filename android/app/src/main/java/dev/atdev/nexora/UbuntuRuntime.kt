@@ -178,21 +178,24 @@ class UbuntuRuntime(context: Context) {
         return p.waitFor() to output
     }
 
-    /** Force explicit Unix execute bits and verify Android can see them. */
+    /**
+     * PRoot is bundled as an APK native library. Android installs native
+     * libraries with their executable permissions already set, and the
+     * installed app library directory can be read-only. Never chmod it:
+     * doing so can fail with EACCES even though the binary is executable.
+     */
     private fun ensureProotExecutable() {
         check(proot.isFile && proot.length() > 0L) {
             "PRoot binary is missing or empty: ${proot.absolutePath}"
         }
-        try {
-            // 0755: owner can read/write/execute; group and others read/execute.
-            Os.chmod(proot.absolutePath, 493)
+        val mode = try {
+            Os.stat(proot.absolutePath).st_mode
         } catch (e: Exception) {
-            throw IllegalStateException("Cannot chmod PRoot: ${e.message}", e)
+            throw IllegalStateException("Cannot inspect bundled PRoot: ${e.message}", e)
         }
-        val mode = Os.stat(proot.absolutePath).st_mode
         val executeBits = mode and 73 // 0111
         check(executeBits != 0 && proot.canExecute()) {
-            "PRoot is not executable after chmod 0755 (mode=${mode.toString(8)}, path=${proot.absolutePath}). Android may be blocking execution from this storage location."
+            "Bundled PRoot is not executable (mode=${mode.toString(8)}, ABI=${Build.SUPPORTED_ABIS.joinToString()}, path=${proot.absolutePath}). Rebuild the APK with PRoot packaged as an Android native library."
         }
     }
 
