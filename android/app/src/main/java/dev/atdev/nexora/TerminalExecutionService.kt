@@ -167,6 +167,7 @@ class TerminalExecutionService : Service() {
             try {
                 val installer = QemuBinaryInstaller(this)
                 val qemu = installer.installFromAssets()
+                sendOutput(installer.smokeTest(qemu))
                 val firmware = installer.installFirmwareFromAssets()
                 val writableVars = installer.prepareWritableFirmwareVars(firmware)
                 val vmDirectory = File(filesDir, "qemu/vm")
