@@ -170,9 +170,8 @@ class TerminalExecutionService : Service() {
                     seedImage = seed,
                     memoryMb = 1024,
                     cpuCount = 2,
-                    onOutput = { line ->
-                        sendOutput(line)
-                        updateNotification("Ubuntu VM is running")
+                    onOutput = { chunk ->
+                        sendQemuSerialOutput(chunk)
                     },
                     onExit = { code ->
                         qemuController = null
@@ -241,6 +240,11 @@ class TerminalExecutionService : Service() {
         stopSelf(startId)
     }
 
+    private fun sendQemuSerialOutput(chunk: String) {
+        sendBroadcast(Intent(ACTION_QEMU_SERIAL_OUTPUT).setPackage(packageName)
+            .putExtra(EXTRA_QEMU_SERIAL_TEXT, chunk))
+    }
+
     private fun sendOutput(line: String) {
         sendBroadcast(Intent(ACTION_OUTPUT).setPackage(packageName).putExtra(EXTRA_OUTPUT, line))
     }
@@ -296,6 +300,8 @@ class TerminalExecutionService : Service() {
         const val ACTION_QEMU_INSTALL_FINISHED = "dev.atdev.nexora.QEMU_INSTALL_FINISHED"
         const val ACTION_QEMU_VM_STARTED = "dev.atdev.nexora.QEMU_VM_STARTED"
         const val ACTION_QEMU_VM_STOPPED = "dev.atdev.nexora.QEMU_VM_STOPPED"
+        const val ACTION_QEMU_SERIAL_OUTPUT = "dev.atdev.nexora.QEMU_SERIAL_OUTPUT"
+        const val EXTRA_QEMU_SERIAL_TEXT = "qemu_serial_text"
         const val EXTRA_HOSTNAME = "hostname"
         const val EXTRA_QEMU_INPUT = "qemu_input"
         const val EXTRA_QEMU_INSTALL_SUCCESS = "qemu_install_success"
