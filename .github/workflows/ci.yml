@@ -139,6 +139,7 @@ jobs:
           sha256sum --check SHA256SUMS
           cd /tmp/nexora-qemu-android-arm64
           test -s qemu-system-aarch64
+          cd "$GITHUB_WORKSPACE/android"
           mkdir -p app/src/main/assets/qemu/arm64-v8a
           install -m 0755 /tmp/nexora-qemu-android-arm64/qemu-system-aarch64 app/src/main/assets/qemu/arm64-v8a/
           find /tmp/nexora-qemu-android-arm64 -maxdepth 1 -type f -name '*.so*' \
