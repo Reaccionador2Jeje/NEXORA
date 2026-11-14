@@ -100,10 +100,16 @@ jobs:
       - name: Package verified PRoot binaries for Android ABIs
         working-directory: android
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p app/src/main/jniLibs
-          release="$(curl -fsSL https://api.github.com/repos/ahmed-alnassif/proot/releases/latest)"
+          release="$(curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/ahmed-alnassif/proot/releases/latest)"
           for pair in "arm64-v8a:aarch64" "armeabi-v7a:arm" "x86_64:x86_64" "x86:x86"; do
             abi="${pair%%:*}"
             arch="${pair##*:}"
