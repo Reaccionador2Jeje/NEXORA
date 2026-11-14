@@ -80,7 +80,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
         }.start()
     }
 
-    override fun execute(command: String, user: String, uid: Int, androidShared: File? = null, line: (String) -> Unit, done: (Int) -> Unit) {
+    override fun execute(command: String, user: String, uid: Int, androidShared: File?, line: (String) -> Unit, done: (Int) -> Unit) {
         Thread {
             var code = 1
             try {
