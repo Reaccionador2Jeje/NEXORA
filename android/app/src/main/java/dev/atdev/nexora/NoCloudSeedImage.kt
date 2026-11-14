@@ -21,6 +21,7 @@ object NoCloudSeedImage {
         val userData = """
             #cloud-config
             hostname: $hostname
+            network: {config: disabled}
             manage_etc_hosts: true
             users:
               - default
