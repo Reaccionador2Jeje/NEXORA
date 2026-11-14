@@ -51,6 +51,7 @@ class QemuVmController(
                 "-drive", "if=pflash,format=raw,file=${firmwareVars.absolutePath}",
                 "-drive", "if=none,id=system,format=qcow2,file=${diskImage.absolutePath}",
                 "-device", "virtio-blk-device,drive=system",
+                "-nic", "none",
                 "-display", "none",
                 "-serial", "stdio",
                 "-monitor", "none",
