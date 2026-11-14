@@ -10,6 +10,10 @@ The project is developed as a modular terminal engine first, so its command syst
 
 GitHub Actions validates every push and pull request targeting `main` on Ubuntu and Windows. The workflow checks Rust formatting, compiles the Rust workspace, runs its tests on Ubuntu and Windows, and builds the Android debug APK.
 
+## Android runtime migration
+
+The Android app has begun a staged migration from PRoot to QEMU System Emulation. The runtime boundary is now separated from the UI and execution service, and the migration plan is documented in [`docs/QEMU_ANDROID_MIGRATION.md`](docs/QEMU_ANDROID_MIGRATION.md). The current active engine is still the legacy PRoot implementation; QEMU is not yet packaged or booting Ubuntu. It will become the default only after physical-device boot, terminal, persistence, and recovery tests pass.
+
 ## Project status
 
 **Early development — version 0.1.0**
