@@ -12,7 +12,7 @@ GitHub Actions validates every push and pull request targeting `main` on Ubuntu 
 
 ## Android runtime migration
 
-The Android app has begun a staged migration from PRoot to QEMU System Emulation. The runtime boundary is now separated from the UI and execution service, and the migration plan is documented in [`docs/QEMU_ANDROID_MIGRATION.md`](docs/QEMU_ANDROID_MIGRATION.md). The current active engine is still the legacy PRoot implementation; QEMU is not yet packaged or booting Ubuntu. It will become the default only after physical-device boot, terminal, persistence, and recovery tests pass.
+The Android app now selects QEMU System Emulation as its Linux runtime. Android CI builds the standalone ARM64 QEMU executable, packages its shared libraries and AAVMF firmware into the APK, and then builds the APK from that verified artifact. Ubuntu 24.04 is provisioned as a persistent VM and exposed through the serial terminal. Physical-device boot, persistence, and recovery acceptance tests are still required; PRoot is no longer part of the Android installer or APK.
 
 ## Project status
 
