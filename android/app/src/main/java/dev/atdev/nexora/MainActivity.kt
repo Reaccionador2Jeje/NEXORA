@@ -783,12 +783,11 @@ class MainActivity : Activity() {
         appendLine("Your Terminal. Your Universe.")
         appendLine("")
         if (ubuntuRuntime.isInstalled()) {
-            appendLine("Ubuntu 24.04 runtime: READY")
-            appendLine("Linux commands are routed to Ubuntu.")
+            appendLine("Legacy PRoot fallback: READY")
         } else {
-            appendLine("Ubuntu runtime: NOT INSTALLED")
-            appendLine("Run install-ubuntu to provision Ubuntu 24.04.")
+            appendLine("Legacy PRoot fallback: NOT INSTALLED")
         }
+        appendLine("Independent Ubuntu VM: run qemu-install, then qemu-start.")
         appendLine("Type 'help' to see available commands.")
         promptLabel.text = prompt
         updateRuntimeStatus()
@@ -814,15 +813,16 @@ class MainActivity : Activity() {
 
         when (command) {
             "help" -> {
-                appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, qemu-check, qemu-install, qemu-start, qemu-stop, qemu-status, exit")
+                appendLine("NEXORA: help, version, clear, qemu-check, qemu-install, qemu-start, qemu-stop, qemu-status, exit")
+                appendLine("Legacy fallback: legacy-install-ubuntu, legacy-ubuntu-status (aliases: install-ubuntu, ubuntu-status)")
                 appendLine("Ubuntu commands: git, apt, bash, python3, ls, cd, pwd, cat, nano, etc.")
             }
             "version" -> appendLine("NEXORA Android 0.3.0")
             "clear", "cls" -> output.text = ""
-            "install-ubuntu" -> installUbuntuRuntime()
-            "ubuntu-status" -> appendLine(
-                if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 runtime: installed"
-                else "Ubuntu runtime: not installed. Run install-ubuntu."
+            "install-ubuntu", "legacy-install-ubuntu" -> installUbuntuRuntime()
+            "ubuntu-status", "legacy-ubuntu-status" -> appendLine(
+                if (ubuntuRuntime.isInstalled()) "Legacy PRoot Ubuntu fallback: installed"
+                else "Legacy PRoot Ubuntu fallback: not installed."
             )
             "qemu-check" -> checkQemuRuntime()
             "qemu-install" -> installQemuVm()
