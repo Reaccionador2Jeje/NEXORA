@@ -45,6 +45,7 @@ class NoCloudSeedImageTest {
             val user = readFatFile(image, fat, files.getValue("user-data"))
             val metadata = readFatFile(image, fat, files.getValue("meta-data"))
             assertTrue(user.contains("#cloud-config"))
+            assertTrue(user.contains("network: {config: disabled}"))
             assertTrue(user.contains("serial-getty@ttyAMA0.service"))
             assertTrue(user.contains("--keep-baud 115200,38400,9600"))
             assertTrue(user.contains("agetty --autologin nexora"))
