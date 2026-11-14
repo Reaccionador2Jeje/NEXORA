@@ -460,7 +460,7 @@ class MainActivity : Activity() {
         panel.addView(storage, storageActionParams)
 
         val help = makeActionButton("⌨  COMMAND HELP", 0xFFBDEBFF.toInt(), 0xFF18334A.toInt(), false) {
-            appendLine("Commands: help, version, install-ubuntu, ubuntu-status, clear, exit")
+            appendLine("Commands: help, version, install-ubuntu, qemu-check, qemu-start, qemu-stop, ubuntu-status, clear, exit")
             decor.removeView(overlay)
         }
         val helpParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
@@ -751,7 +751,6 @@ class MainActivity : Activity() {
                 else "QEMU Ubuntu ARM64 VM: not installed"
             )
             "qemu-check" -> checkQemuRuntime()
-            "qemu-install" -> installQemuVm()
             "qemu-start" -> startQemuVm()
             "qemu-stop" -> stopQemuVm()
             "qemu-status" -> {
@@ -795,31 +794,6 @@ class MainActivity : Activity() {
         }
         promptLabel.text = prompt
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
-    }
-
-    private fun installQemuVm() {
-        if (File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile &&
-            File(filesDir, "qemu/vm/cidata.img").isFile &&
-            File(filesDir, "qemu/arm64-v8a/qemu-system-aarch64").isFile &&
-            File(filesDir, "qemu/firmware/aavmf/AAVMF_CODE.fd").isFile) {
-            appendLine("Ubuntu QEMU VM is already prepared. Run qemu-start.")
-            return
-        }
-        appendLine("Starting independent Ubuntu 24.04 ARM64 VM preparation…")
-        appendLine("The official cloud disk is approximately 600 MB; keep enough free storage.")
-        input.isEnabled = false
-        val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_PREPARE_QEMU_UBUNTU
-            putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
-            putExtra(TerminalExecutionService.EXTRA_HOSTNAME, hostname)
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
-            else startService(serviceIntent)
-        } catch (error: Exception) {
-            input.isEnabled = true
-            appendLine("Could not start QEMU VM preparation: ${error.message}")
-        }
     }
 
     private fun startQemuVm() {
