@@ -67,6 +67,8 @@ jobs:
           "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang" --version
           test -f qemu-src/configure
           test -f qemu-src/meson.build
+          bash -n scripts/build-qemu-android.sh
+          bash -n scripts/smoke-test-ubuntu-arm64.sh
           grep -q -- '--target-list=' qemu-src/configure
           git -C qemu-src describe --tags --exact-match | grep -Fx 'v10.1.2'
           {
