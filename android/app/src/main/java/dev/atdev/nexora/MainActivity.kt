@@ -96,6 +96,7 @@ class MainActivity : Activity() {
         }
     }
 
+    private val supabaseAuth by lazy { SupabaseAuth(this) }
     private val preferences by lazy { getSharedPreferences("nexora", MODE_PRIVATE) }
     private val prompt: String
         get() = "$username@$hostname:${displayPath()}$ "
@@ -112,6 +113,11 @@ class MainActivity : Activity() {
             ?: filesDir
 
         buildInterface()
+        handleAuthDeepLink(intent?.data)
+        supabaseAuth.refreshIfNeeded { result ->
+            result.onSuccess { account -> if (account != null) appendLine("NEXORA account: $account") }
+                .onFailure { appendLine("NEXORA account session expired. Sign in again.") }
+        }
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7401)
@@ -343,6 +349,56 @@ class MainActivity : Activity() {
             setPadding(0, dp(3), 0, dp(18))
         })
 
+        val authHeading = TextView(this).apply {
+            text = "NEXORA ACCOUNT"
+            textSize = 9f
+            letterSpacing = 0.14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF8295B3.toInt())
+            setPadding(dp(2), dp(2), 0, dp(8))
+        }
+        panel.addView(authHeading)
+
+        val accountLabel = TextView(this).apply {
+            text = supabaseAuth.accountLabel()?.let { "●  $it" } ?: "○  Not signed in"
+            textSize = 11f
+            setTextColor(0xFFE1EDFC.toInt())
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = roundedBackground(intArrayOf(0xFF101A2A.toInt(), 0xFF101A2A.toInt()), 12)
+        }
+        panel.addView(accountLabel)
+
+        val googleLogin = makeActionButton("G  CONTINUE WITH GOOGLE", 0xFF071827.toInt(), 0xFFBBDDF5.toInt(), true) {
+            decor.removeView(overlay)
+            startProviderLogin("google")
+        }
+        val googleParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
+        googleParams.topMargin = dp(8)
+        panel.addView(googleLogin, googleParams)
+
+        val githubLogin = makeActionButton("⌘  CONTINUE WITH GITHUB", 0xFFFFFFFF.toInt(), 0xFF26364E.toInt(), false) {
+            decor.removeView(overlay)
+            startProviderLogin("github")
+        }
+        val githubParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
+        githubParams.topMargin = dp(7)
+        panel.addView(githubLogin, githubParams)
+
+        val signOut = makeActionButton("SIGN OUT", 0xFFFECACA.toInt(), 0xFF3B202B.toInt(), false) {
+            decor.removeView(overlay)
+            supabaseAuth.signOut { result ->
+                result.onSuccess {
+                    appendLine("Signed out from NEXORA.")
+                    Toast.makeText(this, "Session closed", Toast.LENGTH_SHORT).show()
+                }.onFailure { error ->
+                    appendLine("Sign-out notice: ${error.message}")
+                }
+            }
+        }
+        val signOutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(38))
+        signOutParams.topMargin = dp(7)
+        panel.addView(signOut, signOutParams)
+
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(14), dp(14), dp(14))
@@ -440,6 +496,34 @@ class MainActivity : Activity() {
         decor.addView(overlay, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ))
+    }
+
+    private fun startProviderLogin(provider: String) {
+        try {
+            supabaseAuth.startOAuth(this, provider)
+            appendLine("Opening $provider sign-in in your browser…")
+        } catch (error: Exception) {
+            appendLine("Could not start sign-in: ${error.message}")
+            Toast.makeText(this, "Could not open sign-in", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun handleAuthDeepLink(uri: Uri?) {
+        supabaseAuth.handleDeepLink(uri) { result ->
+            result.onSuccess { account ->
+                appendLine("NEXORA account connected: $account")
+                Toast.makeText(this, "Signed in successfully", Toast.LENGTH_LONG).show()
+            }.onFailure { error ->
+                appendLine("Sign-in failed: ${error.message}")
+                Toast.makeText(this, "Sign-in failed", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAuthDeepLink(intent?.data)
     }
 
     private fun roundedBackground(colors: IntArray, radius: Int): GradientDrawable =
