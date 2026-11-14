@@ -144,10 +144,22 @@ test -s "$QEMU_BUILD/qemu-system-aarch64"
 "$TOOLCHAIN/llvm-readelf" -h "$QEMU_BUILD/qemu-system-aarch64" | grep -q 'AArch64'
 "$TOOLCHAIN/llvm-readelf" -l "$QEMU_BUILD/qemu-system-aarch64" | grep -q '/system/bin/linker64'
 
+RUNTIME_LIBS="$WORK/runtime-libs"
+mkdir -p "$RUNTIME_LIBS"
+while IFS= read -r library; do
+  ln -s "$library" "$RUNTIME_LIBS/$(basename "$library")" 2>/dev/null || true
+done < <(find "$PREFIX/lib" -maxdepth 1 -type f -name '*.so*' -print)
+NDK_RUNTIME_LIBS="$SYSROOT/usr/lib/aarch64-linux-android/$API"
+if [ -d "$NDK_RUNTIME_LIBS" ]; then
+  while IFS= read -r library; do
+    ln -s "$library" "$RUNTIME_LIBS/$(basename "$library")" 2>/dev/null || true
+  done < <(find "$NDK_RUNTIME_LIBS" -maxdepth 1 -type f -name '*.so*' -print)
+fi
+
 mkdir -p "$ROOT/artifacts/qemu-android-arm64"
 python3 "$ROOT/scripts/package-qemu-android.py" \
   --binary "$QEMU_BUILD/qemu-system-aarch64" \
-  --library-dir "$PREFIX/lib" \
+  --library-dir "$RUNTIME_LIBS" \
   --output "$ROOT/artifacts/qemu-android-arm64" \
   --readelf "$TOOLCHAIN/llvm-readelf"
 
