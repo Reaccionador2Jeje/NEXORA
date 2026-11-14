@@ -72,7 +72,7 @@ class TerminalExecutionService : Service() {
                     command.orEmpty(),
                     username,
                     uid,
-                    bridge.sharedDirectory,
+                    if (treeUri != null) bridge.sharedDirectory else null,
                     { line ->
                         sendOutput(line)
                         updateNotification("Running: $command")
