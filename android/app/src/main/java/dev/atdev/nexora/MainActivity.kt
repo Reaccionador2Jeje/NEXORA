@@ -288,9 +288,13 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        if (terminalReceiverRegistered) return
         val filter = IntentFilter().apply {
             addAction(TerminalExecutionService.ACTION_OUTPUT)
             addAction(TerminalExecutionService.ACTION_FINISHED)
+            // Without this action the UI never receives the install result,
+            // leaving the prompt disabled and hiding the actual failure.
+            addAction(TerminalExecutionService.ACTION_INSTALL_FINISHED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(terminalReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -301,12 +305,18 @@ class MainActivity : Activity() {
         terminalReceiverRegistered = true
     }
 
+    // Keep the receiver registered while the Activity is stopped so progress
+    // output is not discarded merely because the user switches apps.
     override fun onStop() {
+        super.onStop()
+    }
+
+    override fun onDestroy() {
         if (terminalReceiverRegistered) {
             unregisterReceiver(terminalReceiver)
             terminalReceiverRegistered = false
         }
-        super.onStop()
+        super.onDestroy()
     }
 
     private fun showUbuntuSetup() {
