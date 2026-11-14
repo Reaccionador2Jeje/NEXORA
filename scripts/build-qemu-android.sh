@@ -104,7 +104,8 @@ strip = '$STRIP'
 pkg-config = '/usr/bin/pkg-config'
 
 [properties]
-sys_root = '$SYSROOT'
+# NDK Clang already embeds its Android sysroot. Omitting Meson's sys_root
+# avoids incorrectly prefixing absolute dependency include paths with it.
 pkg_config_libdir = ['$PREFIX/lib/pkgconfig', '$PREFIX/share/pkgconfig']
 
 [built-in options]
