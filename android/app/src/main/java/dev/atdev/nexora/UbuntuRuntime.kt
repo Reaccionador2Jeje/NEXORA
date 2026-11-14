@@ -25,10 +25,10 @@ class UbuntuRuntime(context: Context) {
         proot.canExecute() && isRootfsExecutable()
 
     private fun isRootfsExecutable(): Boolean {
-        val bash = File(root, "usr/bin/bash")
-        if (!bash.isFile || !bash.canExecute()) return false
+        val required = listOf(File(root, "usr/bin/bash"), File(root, "usr/bin/env"))
+        if (required.any { !it.isFile || !it.canExecute() }) return false
         return try {
-            (Os.stat(bash.absolutePath).st_mode and 0x49) != 0
+            required.all { (Os.stat(it.absolutePath).st_mode and 0x49) != 0 }
         } catch (_: Exception) {
             false
         }
@@ -41,7 +41,10 @@ class UbuntuRuntime(context: Context) {
         check((mode and 0x49) != 0 && bash.canExecute()) {
             "Ubuntu bash is not executable (mode=${mode.toString(8)}). The rootfs must be repaired."
         }
-        check(File(root, "usr/bin/env").isFile) { "Ubuntu rootfs is incomplete: /usr/bin/env is missing" }
+        val env = File(root, "usr/bin/env")
+        check(env.isFile && env.canExecute() && (Os.stat(env.absolutePath).st_mode and 0x49) != 0) {
+            "Ubuntu /usr/bin/env is missing or not executable"
+        }
     }
 
     fun install(user: String, password: String, progress: (String) -> Unit, done: (Boolean, String, Int) -> Unit) {
