@@ -90,7 +90,7 @@ class UbuntuVmInstaller(private val context: Context) {
             }
             val total = connection.contentLengthLong
             val required = if (total > 0) total + 256L * 1024L * 1024L else 900L * 1024L * 1024L
-            check(destination.parentFile?.usableSpace ?: 0L >= required) {
+            check((destination.parentFile?.usableSpace ?: 0L) >= required) {
                 "Not enough free storage. NEXORA needs about ${required / (1024 * 1024)} MB free for the Ubuntu VM."
             }
 
