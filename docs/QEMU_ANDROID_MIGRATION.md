@@ -40,7 +40,7 @@ The QEMU engine needs its own:
 
 NEXORA must not depend on Termux at build time or runtime. The QEMU workflow is being migrated to an official standalone Android NDK toolchain and upstream QEMU sources. It must produce an Android/Bionic `arm64-v8a` executable and bundle only the shared libraries built for NEXORA. No Termux package builder, Termux prefix, or Termux runtime files may enter the APK.
 
-The standalone workflow now pins the official QEMU v10.1.2 tag from the project's GitHub mirror and validates the official NDK. QEMU's configure script and target-selection interface are checked without relying on a brittle search for the literal target name. The workflow still does **not yet compile QEMU**: Android requires target-built GLib/Pixman dependencies and Android-specific build integration. No QEMU runtime artifact is considered ready until the binary, dependency closure, and physical-device execution are verified.
+The standalone workflow pins QEMU v10.1.2, uses the official Android NDK r30, and now has a cross-build script for Android ARM64. That script builds libffi, PCRE2, GLib, and Pixman for the Android target before configuring QEMU with TCG and a serial/headless feature set. The first full build is being exercised in CI; its success is not assumed. No QEMU runtime artifact is considered ready until the binary, dependency closure, and physical-device execution are verified.
 
 - Produce a reproducible `arm64-v8a` QEMU System build for Android/Bionic.
 - Package all required shared libraries and verify the executable's ELF interpreter and dependencies in CI.
