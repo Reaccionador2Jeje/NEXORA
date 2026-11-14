@@ -40,7 +40,14 @@ class UbuntuRuntime(context: Context) {
                 val uid = uidResult.second.trim().toInt()
                 done(true, "Ubuntu 24.04 LTS installed. User $user (UID $uid).", uid)
             } catch (e: Exception) {
-                done(false, e.message ?: e.javaClass.simpleName, -1)
+                val details = generateSequence(e as Throwable?) { it.cause }
+                    .mapIndexed { index, cause ->
+                        val label = if (index == 0) "Installation error" else "Caused by"
+                        "$label: ${cause.javaClass.simpleName}: ${cause.message ?: "(no message)"}"
+                    }
+                    .joinToString("\n")
+                progress("ERROR: ${e.javaClass.simpleName}: ${e.message ?: "Ubuntu installation failed"}")
+                done(false, details, -1)
             }
         }.start()
     }
