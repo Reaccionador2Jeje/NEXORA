@@ -30,8 +30,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake bc bison build-essential cmake curl flex git \
-            libtool meson ninja-build \
-            pkg-config python3 python3-pip python3-venv qemu-efi-aarch64 unzip wget
+            dosfstools libtool meson mtools ninja-build \
+            pkg-config python3 python3-pip python3-venv qemu-efi-aarch64 qemu-system-arm unzip wget
 
       - name: Install official Android NDK
         shell: bash
@@ -101,6 +101,10 @@ jobs:
             cd "$firmware"
             sha256sum AAVMF_CODE.fd.gz AAVMF_VARS.fd.gz > SHA256SUMS
           )
+
+      - name: Boot Ubuntu ARM64 with UEFI and NoCloud
+        shell: bash
+        run: bash scripts/smoke-test-ubuntu-arm64.sh
 
       - name: Upload standalone QEMU ARM64 candidate
         uses: actions/upload-artifact@v4
