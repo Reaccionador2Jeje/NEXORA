@@ -25,7 +25,8 @@ class UbuntuVmInstaller(private val context: Context) {
         require(Regex("^[a-z0-9][a-z0-9-]{0,62}$").matches(hostname)) { "Invalid Linux hostname." }
 
         val qemuInstaller = QemuBinaryInstaller(context)
-        qemuInstaller.installFromAssets()
+        val qemu = qemuInstaller.installFromAssets()
+        progress(qemuInstaller.smokeTest(qemu))
         val firmware = qemuInstaller.installFirmwareFromAssets()
         val writableVars = qemuInstaller.prepareWritableFirmwareVars(firmware)
 
