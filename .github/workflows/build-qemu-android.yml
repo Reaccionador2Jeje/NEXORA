@@ -10,6 +10,11 @@ on:
       - "scripts/build-qemu-android.sh"
       - "scripts/smoke-test-ubuntu-arm64.sh"
       - "docs/QEMU_ANDROID_MIGRATION.md"
+      - ".github/workflows/ci.yml"
+      - "android/app/build.gradle.kts"
+      - "android/app/src/main/AndroidManifest.xml"
+      - "android/app/src/main/java/**"
+      - "android/app/src/main/assets/**"
 
 permissions:
   contents: read
