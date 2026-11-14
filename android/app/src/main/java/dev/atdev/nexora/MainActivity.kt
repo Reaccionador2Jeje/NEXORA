@@ -83,6 +83,8 @@ class MainActivity : Activity() {
                     promptLabel.text = prompt
                     input.requestFocus()
                 }
+                TerminalExecutionService.ACTION_QEMU_SERIAL_OUTPUT ->
+                    appendText(intent.getStringExtra(TerminalExecutionService.EXTRA_QEMU_SERIAL_TEXT).orEmpty())
                 TerminalExecutionService.ACTION_QEMU_VM_STARTED -> {
                     qemuVmActive = true
                     input.isEnabled = true
@@ -655,6 +657,7 @@ class MainActivity : Activity() {
             addAction(TerminalExecutionService.ACTION_QEMU_INSTALL_FINISHED)
             addAction(TerminalExecutionService.ACTION_QEMU_VM_STARTED)
             addAction(TerminalExecutionService.ACTION_QEMU_VM_STOPPED)
+            addAction(TerminalExecutionService.ACTION_QEMU_SERIAL_OUTPUT)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(terminalReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -1082,7 +1085,11 @@ class MainActivity : Activity() {
     }
 
     private fun appendLine(value: String) {
-        output.append("$value\n")
+        appendText("$value\n")
+    }
+
+    private fun appendText(value: String) {
+        output.append(value)
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
