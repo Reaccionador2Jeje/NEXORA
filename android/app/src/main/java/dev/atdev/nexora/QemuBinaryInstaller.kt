@@ -100,7 +100,8 @@ class QemuBinaryInstaller(private val context: Context) {
                     FileOutputStream(File(staging, name)).use { output -> input.copyTo(output) }
                 }
             }
-            verifyChecksums(staging)
+            verifyChecksums(staging, "AAVMF_CODE.fd.gz")
+            check(File(staging, "AAVMF_VARS.fd.gz").isFile) { "UEFI variable store is missing." }
             for (name in listOf("AAVMF_CODE.fd", "AAVMF_VARS.fd")) {
                 GZIPInputStream(File(staging, "$name.gz").inputStream()).use { input ->
                     FileOutputStream(File(staging, name)).use { output -> input.copyTo(output) }
@@ -164,7 +165,7 @@ class QemuBinaryInstaller(private val context: Context) {
         return output.lineSequence().firstOrNull().orEmpty()
     }
 
-    private fun verifyChecksums(directory: File) {
+    private fun verifyChecksums(directory: File, requiredFile: String = "qemu-system-aarch64") {
         val manifest = File(directory, "SHA256SUMS")
         check(manifest.isFile) { "QEMU checksum manifest is missing." }
         val entries = manifest.readLines().filter { it.isNotBlank() }
@@ -191,6 +192,6 @@ class QemuBinaryInstaller(private val context: Context) {
             check(actual == expected) { "QEMU runtime checksum mismatch: $name" }
             verified += name
         }
-        check("qemu-system-aarch64" in verified) { "QEMU executable is not covered by the checksum manifest." }
+        check(requiredFile in verified) { "Required runtime file is not covered by the checksum manifest: $requiredFile" }
     }
 }
