@@ -831,7 +831,11 @@ class MainActivity : Activity() {
             "qemu-status" -> {
                 val diskReady = File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile
                 val seedReady = File(filesDir, "qemu/vm/cidata.img").isFile
+                val qemuReady = File(filesDir, "qemu/arm64-v8a/qemu-system-aarch64").isFile
+                val firmwareReady = File(filesDir, "qemu/firmware/aavmf/AAVMF_CODE.fd").isFile
                 appendLine("QEMU VM: ${if (qemuVmActive) "RUNNING" else "STOPPED"}")
+                appendLine("QEMU Android binary: ${if (qemuReady) "installed" else "missing"}")
+                appendLine("ARM64 UEFI firmware: ${if (firmwareReady) "installed" else "missing"}")
                 appendLine("Ubuntu ARM64 disk: ${if (diskReady) "prepared" else "not installed"}")
                 appendLine("NoCloud first-boot seed: ${if (seedReady) "prepared" else "missing"}")
             }
@@ -869,7 +873,9 @@ class MainActivity : Activity() {
 
     private fun installQemuVm() {
         if (File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile &&
-            File(filesDir, "qemu/vm/cidata.img").isFile) {
+            File(filesDir, "qemu/vm/cidata.img").isFile &&
+            File(filesDir, "qemu/arm64-v8a/qemu-system-aarch64").isFile &&
+            File(filesDir, "qemu/firmware/aavmf/AAVMF_CODE.fd").isFile) {
             appendLine("Ubuntu QEMU VM is already prepared. Run qemu-start.")
             return
         }
@@ -902,7 +908,7 @@ class MainActivity : Activity() {
             return
         }
         input.isEnabled = false
-        appendLine("Starting Ubuntu ARM64 under QEMU TCG…")
+        appendLine("Starting Ubuntu ARM64 under QEMU TCG (offline mode; guest networking is not built yet)…")
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
             action = TerminalExecutionService.ACTION_START_QEMU_VM
         }
