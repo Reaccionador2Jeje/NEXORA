@@ -40,11 +40,11 @@ The QEMU engine needs its own:
 
 NEXORA must not depend on Termux at build time or runtime. The QEMU workflow is being migrated to an official standalone Android NDK toolchain and upstream QEMU sources. It must produce an Android/Bionic `arm64-v8a` executable and bundle only the shared libraries built for NEXORA. No Termux package builder, Termux prefix, or Termux runtime files may enter the APK.
 
-The standalone workflow pins QEMU v10.1.2, uses the official Android NDK r30, and now has a cross-build script for Android ARM64. That script builds libffi, GNU libiconv, PCRE2, GLib, and Pixman for the Android target before configuring QEMU with TCG and a serial/headless feature set. GLib's Meson cross-file explicitly exposes the NDK-built dependency headers and static libraries, while relying on the NDK Clang driver's embedded sysroot to avoid double-prefixing absolute include paths. The first full build is being exercised in CI; its success is not assumed. No QEMU runtime artifact is considered ready until the binary, dependency closure, and physical-device execution are verified.
+The standalone workflow pins QEMU v10.1.2, uses the official Android NDK r30, and now has a cross-build script for Android ARM64. That script builds libffi, GNU libiconv, PCRE2, GLib, and Pixman for the Android target before configuring QEMU with TCG and a serial/headless feature set. GLib's Meson cross-file explicitly exposes the NDK-built dependency headers and static libraries, while relying on the NDK Clang driver's embedded sysroot to avoid double-prefixing absolute include paths. The standalone Meson cross file uses the `pkgconfig` binary key and explicitly disables Xen probing, which is not part of NEXORA's Android guest target. A successful QEMU workflow publishes a checksummed runtime artifact; the Android CI then downloads that exact artifact and packages only the executable, its shared libraries, and checksum manifest into APK assets. `QemuBinaryInstaller` extracts and verifies those files on-device and runs a `--version` linker smoke test. `QemuVmController` owns a headless process and serial byte stream, but it is not yet selected as the active Linux engine. No QEMU runtime artifact is considered ready until the binary, dependency closure, and physical-device execution are verified.
 
 - Produce a reproducible `arm64-v8a` QEMU System build for Android/Bionic.
 - Package all required shared libraries and verify the executable's ELF interpreter and dependencies in CI.
-- Confirm that the emulator starts on a real Android device and accepts a serial console.
+- Confirm that the emulator starts on a real Android device and accepts a serial console. The app's `qemu-check` command verifies extraction, checksums, Android linker startup, and the QEMU version response; it does not claim that Ubuntu has booted.
 - Do not package a desktop GUI build; NEXORA owns the terminal UI.
 
 ### Stage 3 — boot a minimal ARM64 guest
@@ -60,7 +60,7 @@ The standalone workflow pins QEMU v10.1.2, uses the official Android NDK r30, an
 - Add network access only after the offline boot path is reliable.
 
 ### Stage 5 — terminal integration and cutover
-- Connect NEXORA's terminal UI to the guest serial console.
+- Connect NEXORA's terminal UI to the guest serial console using the new process/serial controller, including login provisioning and exit-status framing.
 - Keep one persistent shell session so `cd`, shell variables, jobs, and interactive programs behave naturally.
 - Add graceful stop/recovery and disk-space diagnostics.
 - Make QEMU the default only after real-device acceptance tests pass. Remove PRoot only in a later cleanup release.
