@@ -39,14 +39,19 @@ clone_tag() {
 }
 
 echo "==> Fetching pinned Android dependency sources"
-clone_tag https://github.com/libffi/libffi.git v3.4.8 libffi
+LIBFFI_ARCHIVE="$WORK/libffi-3.4.8.tar.gz"
+curl --fail --location --retry 3 \
+  https://github.com/libffi/libffi/releases/download/v3.4.8/libffi-3.4.8.tar.gz \
+  -o "$LIBFFI_ARCHIVE"
+echo "bc9842a18898bfacb0ed1252c4febcc7e78fa139fd27fdc7a3e30d9d9356119b  $LIBFFI_ARCHIVE" | sha256sum --check -
+tar -xzf "$LIBFFI_ARCHIVE" -C "$SRC"
+mv "$SRC/libffi-3.4.8" "$SRC/libffi"
 clone_tag https://github.com/PCRE2Project/pcre2.git pcre2-10.45 pcre2
 clone_tag https://github.com/GNOME/glib.git 2.84.4 glib
 clone_tag https://gitlab.freedesktop.org/pixman/pixman.git pixman-0.46.4 pixman
 
 echo "==> Building libffi for Android"
 cd "$SRC/libffi"
-autoreconf -fi
 mkdir -p "$BUILD/libffi"
 cd "$BUILD/libffi"
 "$SRC/libffi/configure" \
