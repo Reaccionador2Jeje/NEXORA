@@ -408,7 +408,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(5), 0, dp(3))
         })
         hero.addView(TextView(this).apply {
-            text = "A rootless Linux workspace powered by PRoot."
+            text = "A standalone Ubuntu ARM64 virtual machine powered by QEMU."
             textSize = 11f
             setTextColor(0xFFB6C8E2.toInt())
         })
@@ -765,7 +765,7 @@ class MainActivity : Activity() {
                 appendLine("NoCloud first-boot seed: ${if (seedReady) "prepared" else "missing"}")
             }
             "exit", "logout" -> if (qemuVmActive) stopQemuVm()
-                else appendLine("Legacy command execution uses isolated Ubuntu processes.")
+                else appendLine("QEMU Ubuntu VM is stopped.")
             else -> {
                 if (qemuVmActive) {
                     sendQemuInput(line)
