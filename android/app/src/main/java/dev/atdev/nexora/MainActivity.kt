@@ -927,10 +927,14 @@ class MainActivity : Activity() {
     }
 
     private fun sendQemuInput(command: String) {
+        sendQemuSerial("$command\n")
+    }
+
+    private fun sendQemuSerial(text: String) {
         try {
             startService(Intent(this, TerminalExecutionService::class.java).apply {
                 action = TerminalExecutionService.ACTION_QEMU_VM_INPUT
-                putExtra(TerminalExecutionService.EXTRA_QEMU_INPUT, "$command\n")
+                putExtra(TerminalExecutionService.EXTRA_QEMU_INPUT, text)
             })
         } catch (error: Exception) {
             appendLine("Could not send input to QEMU: ${error.message}")
@@ -1009,6 +1013,23 @@ class MainActivity : Activity() {
     }
 
     private fun handleShortcut(key: String) {
+        if (qemuVmActive) {
+            when (key) {
+                "ESC" -> sendQemuSerial("\u001B")
+                "TAB" -> sendQemuSerial("\t")
+                "←" -> sendQemuSerial("\u001B[D")
+                "→" -> sendQemuSerial("\u001B[C")
+                "↑" -> sendQemuSerial("\u001B[A")
+                "↓" -> sendQemuSerial("\u001B[B")
+                "HOME" -> sendQemuSerial("\u001B[H")
+                "END" -> sendQemuSerial("\u001B[F")
+                "Ctrl+C" -> sendQemuSerial("\u0003")
+                "CTRL", "ALT" -> Toast.makeText(this, "Use Ctrl+C to interrupt the running command.", Toast.LENGTH_SHORT).show()
+                else -> insertText(key)
+            }
+            input.requestFocus()
+            return
+        }
         when (key) {
             "ESC" -> Unit
             "TAB" -> insertText("    ")
