@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/build-qemu-android.yml"
       - "scripts/package-qemu-android.py"
+      - "scripts/build-qemu-android.sh"
       - "docs/QEMU_ANDROID_MIGRATION.md"
 
 permissions:
@@ -25,7 +26,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake bc bison build-essential cmake curl flex git \
-            libglib2.0-dev libpixman-1-dev libtool meson ninja-build \
+            libtool meson ninja-build \
             pkg-config python3 python3-pip python3-venv unzip wget
 
       - name: Install official Android NDK
@@ -69,12 +70,19 @@ jobs:
             echo "QEMU commit: $(cat qemu-src/UPSTREAM_COMMIT.txt)"
           } | tee qemu-src/NEXORA_ANDROID_BUILD_INFO.txt
 
-      - name: Upload upstream source and toolchain validation report
+      - name: Build QEMU and Android dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nexora-qemu/src"
+          mv qemu-src "$RUNNER_TEMP/nexora-qemu/src/qemu"
+          QEMU_WORK_DIR="$RUNNER_TEMP/nexora-qemu" \
+            BUILD_JOBS=2 scripts/build-qemu-android.sh
+
+      - name: Upload standalone QEMU ARM64 candidate
         uses: actions/upload-artifact@v4
         with:
-          name: nexora-qemu-android-standalone-build-inputs
-          path: |
-            qemu-src/NEXORA_ANDROID_BUILD_INFO.txt
-            qemu-src/UPSTREAM_COMMIT.txt
+          name: nexora-qemu-android-arm64-candidate
+          path: artifacts/qemu-android-arm64/
           if-no-files-found: error
           retention-days: 14
