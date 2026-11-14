@@ -23,18 +23,22 @@ jobs:
       - name: Install host build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y             autoconf automake bc bison build-essential             cmake curl flex git libtool meson ninja-build             pkg-config python3 python3-pip python3-venv             unzip wget
+          sudo apt-get install -y \
+            autoconf automake bc bison build-essential cmake curl flex git \
+            libglib2.0-dev libpixman-1-dev libtool meson ninja-build \
+            pkg-config python3 python3-pip python3-venv unzip wget
 
       - name: Install official Android NDK
         shell: bash
         run: |
           set -euo pipefail
           NDK_ARCHIVE="android-ndk-r30-linux.zip"
-          NDK_SHA256="753611f410d002cfcd3f3dc2ef49aad532089d3180b436c060a90bf0fcb64df2"
+          NDK_VERSION="30.0.16248370"
+          NDK_SHA1="5107f898313790e449e87eee2183d9a20602dee9"
           mkdir -p "$RUNNER_TEMP/android"
           cd "$RUNNER_TEMP/android"
           curl --fail --location --retry 3             "https://dl.google.com/android/repository/$NDK_ARCHIVE"             -o "$NDK_ARCHIVE"
-          echo "$NDK_SHA256  $NDK_ARCHIVE" | sha256sum --check -
+          echo "$NDK_SHA1  $NDK_ARCHIVE" | sha1sum --check -
           unzip -q "$NDK_ARCHIVE"
           echo "ANDROID_NDK_HOME=$RUNNER_TEMP/android/android-ndk-r30" >> "$GITHUB_ENV"
           test -x "$RUNNER_TEMP/android/android-ndk-r30/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
@@ -55,12 +59,12 @@ jobs:
           test -f qemu-src/configure
           test -f qemu-src/meson.build
           grep -q -- '--target-list=' qemu-src/configure
-          grep -q 'aarch64-softmmu' qemu-src/configure || true
           git -C qemu-src describe --tags --exact-match | grep -Fx 'v10.1.2'
           {
             echo "Build model: standalone Android NDK; no Termux runtime or package builder"
             echo "Android ABI: arm64-v8a"
             echo "Android API: 24"
+            echo "Android NDK: $NDK_VERSION"
             echo "QEMU source: $(git -C qemu-src describe --tags --always)"
             echo "QEMU commit: $(cat qemu-src/UPSTREAM_COMMIT.txt)"
           } | tee qemu-src/NEXORA_ANDROID_BUILD_INFO.txt
