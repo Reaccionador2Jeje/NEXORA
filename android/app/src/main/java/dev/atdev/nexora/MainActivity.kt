@@ -780,7 +780,7 @@ class MainActivity : Activity() {
 
         when (command) {
             "help" -> {
-                appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, exit")
+                appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, qemu-check, exit")
                 appendLine("Ubuntu commands: git, apt, bash, python3, ls, cd, pwd, cat, nano, etc.")
             }
             "version" -> appendLine("NEXORA Android 0.3.0")
@@ -790,6 +790,7 @@ class MainActivity : Activity() {
                 if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 runtime: installed"
                 else "Ubuntu runtime: not installed. Run install-ubuntu."
             )
+            "qemu-check" -> checkQemuRuntime()
             "exit", "logout" -> appendLine("Command execution uses isolated Ubuntu processes.")
             else -> {
                 if (!ubuntuRuntime.isInstalled()) {
@@ -817,6 +818,32 @@ class MainActivity : Activity() {
         }
         promptLabel.text = prompt
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    /** Verifies the packaged Android QEMU executable without starting a guest VM. */
+    private fun checkQemuRuntime() {
+        input.isEnabled = false
+        appendLine("Checking standalone QEMU for Android ARM64…")
+        Thread {
+            val result = runCatching {
+                val installer = QemuBinaryInstaller(this)
+                val installed = installer.installFromAssets()
+                installer.smokeTest(installed)
+            }
+            runOnUiThread {
+                result.onSuccess { version ->
+                    appendLine("QEMU Android runtime: VERIFIED")
+                    appendLine(version)
+                    appendLine("The executable and its Android shared libraries start correctly.")
+                    appendLine("Ubuntu VM boot is a separate stage and is not enabled yet.")
+                }.onFailure { error ->
+                    appendLine("QEMU runtime check failed: ${error.message ?: "unknown error"}")
+                }
+                input.isEnabled = true
+                promptLabel.text = prompt
+                input.requestFocus()
+            }
+        }.start()
     }
 
     private fun installUbuntuRuntime() {
