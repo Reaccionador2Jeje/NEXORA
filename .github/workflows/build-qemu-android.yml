@@ -7,77 +7,67 @@ on:
     paths:
       - ".github/workflows/build-qemu-android.yml"
       - "scripts/package-qemu-android.py"
+      - "docs/QEMU_ANDROID_MIGRATION.md"
 
 permissions:
   contents: read
 
 jobs:
-  build-qemu:
-    name: Build QEMU System AArch64 for Android
+  prepare:
+    name: Prepare standalone Android toolchain
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/termux/package-builder:latest
     steps:
       - name: Check out NEXORA
         uses: actions/checkout@v4
 
-      - name: Check out Termux package build system
-        uses: actions/checkout@v4
-        with:
-          repository: termux/termux-packages
-          ref: master
-          path: third_party/termux-packages
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y             autoconf automake bc bison build-essential             cmake curl flex git libtool meson ninja-build             pkg-config python3 python3-pip python3-venv             unzip wget
 
-      - name: Install Android SDK and NDK required by Termux
-        working-directory: third_party/termux-packages
+      - name: Install official Android NDK
         shell: bash
         run: |
           set -euo pipefail
-          ./scripts/setup-android-sdk.sh
-          test -d "$NDK"
-          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" -o -x "$ANDROID_HOME/cmdline-tools/bin/sdkmanager"
+          NDK_VERSION="30.0.149434ಣ"
+          NDK_ARCHIVE="android-ndk-r30-linux.zip"
+          NDK_SHA256="753611f410d002cfcd3f3dc2ef49aad532089d3180b436c060a90bf0fcb64df2"
+          mkdir -p "$RUNNER_TEMP/android"
+          cd "$RUNNER_TEMP/android"
+          curl --fail --location --retry 3             "https://dl.google.com/android/repository/$NDK_ARCHIVE"             -o "$NDK_ARCHIVE"
+          echo "$NDK_SHA256  $NDK_ARCHIVE" | sha256sum --check -
+          unzip -q "$NDK_ARCHIVE"
+          echo "ANDROID_NDK_HOME=$RUNNER_TEMP/android/android-ndk-r30" >> "$GITHUB_ENV"
+          test -x "$RUNNER_TEMP/android/android-ndk-r30/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
 
-      - name: Build Android AArch64 QEMU package
-        working-directory: third_party/termux-packages
+      - name: Fetch upstream QEMU source
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v10.1.2 https://gitlab.com/qemu-project/qemu.git qemu-src
+          git -C qemu-src rev-parse HEAD | tee qemu-src/UPSTREAM_COMMIT.txt
+
+      - name: Validate standalone toolchain and source
         shell: bash
         run: |
           set -euo pipefail
-          ./build-package.sh -I -j2 qemu-system-x86-64-headless
-
-      - name: Stage QEMU executable and Android shared libraries
-        shell: bash
-        run: |
-          set -euo pipefail
-          PREFIX="/data/data/com.termux/files/usr"
-          QEMU_BIN="$PREFIX/bin/qemu-system-aarch64"
-          test -x "$QEMU_BIN"
-          mkdir -p dist/qemu-runtime-arm64
-          python3 scripts/package-qemu-android.py \
-            --binary "$QEMU_BIN" \
-            --prefix "$PREFIX" \
-            --output dist/qemu-runtime-arm64/lib
-          install -m 0755 "$QEMU_BIN" dist/qemu-runtime-arm64/qemu-system-aarch64
-          cp third_party/termux-packages/packages/qemu-system-x86-64-headless/build.sh dist/qemu-runtime-arm64/TERMUX_BUILD_RECIPE.sh
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang" --version
+          test -f qemu-src/configure
+          test -f qemu-src/meson.build
+          grep -q 'aarch64-softmmu' qemu-src/configure
           {
-            echo "QEMU source version: $(grep '^TERMUX_PKG_VERSION=' third_party/termux-packages/packages/qemu-system-x86-64-headless/build.sh | cut -d= -f2-)"
-            echo "Termux package repository: https://github.com/termux/termux-packages"
-            echo "Host ABI target: arm64-v8a / Android Bionic"
-            echo "Guest system target: aarch64-softmmu"
-          } > dist/qemu-runtime-arm64/BUILD_INFO.txt
+            echo "Build model: standalone Android NDK; no Termux runtime or package builder"
+            echo "Android ABI: arm64-v8a"
+            echo "Android API: 24"
+            echo "QEMU source: $(git -C qemu-src describe --tags --always)"
+            echo "QEMU commit: $(cat qemu-src/UPSTREAM_COMMIT.txt)"
+          } | tee qemu-src/NEXORA_ANDROID_BUILD_INFO.txt
 
-      - name: Verify staged ELF and dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          readelf -h dist/qemu-runtime-arm64/qemu-system-aarch64 | grep -E 'Class:|Machine:'
-          readelf -l dist/qemu-runtime-arm64/qemu-system-aarch64 | grep 'Requesting program interpreter'
-          test -s dist/qemu-runtime-arm64/qemu-system-aarch64
-          test -n "$(find dist/qemu-runtime-arm64/lib -maxdepth 1 -type f -name '*.so*' -print -quit)"
-
-      - name: Upload QEMU Android ARM64 runtime candidate
+      - name: Upload upstream source and toolchain validation report
         uses: actions/upload-artifact@v4
         with:
-          name: nexora-qemu-android-arm64-candidate
-          path: dist/qemu-runtime-arm64/
+          name: nexora-qemu-android-standalone-build-inputs
+          path: |
+            qemu-src/NEXORA_ANDROID_BUILD_INFO.txt
+            qemu-src/UPSTREAM_COMMIT.txt
           if-no-files-found: error
           retention-days: 14
