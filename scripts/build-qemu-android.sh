@@ -101,7 +101,7 @@ c = '$CC'
 cpp = '$CXX'
 ar = '$AR'
 strip = '$STRIP'
-pkg-config = '/usr/bin/pkg-config'
+pkgconfig = '/usr/bin/pkg-config'
 
 [properties]
 # NDK Clang already embeds its Android sysroot. Omitting Meson's sys_root
@@ -158,7 +158,7 @@ mkdir -p "$QEMU_BUILD"
   --extra-cflags="-O2 -fPIC -I$PREFIX/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-rpath-link,$PREFIX/lib" \
   --disable-docs -Dwerror=false \
-  -Dtools=disabled -Dguest_agent=disabled \
+  -Dtools=disabled -Dguest_agent=disabled -Dxen=disabled \
   -Dgtk=disabled -Dsdl=disabled -Dvnc=disabled -Dslirp=disabled \
   -Dcapstone=disabled -Dcurl=disabled -Dlibnfs=disabled \
   -Dspice=disabled -Dusb_redir=disabled -Dlibusb=disabled \
