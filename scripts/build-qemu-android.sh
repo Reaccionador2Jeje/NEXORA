@@ -30,7 +30,6 @@ export CXXFLAGS="-O2 -fPIC"
 export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
 export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
-export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
 
 clone_tag() {
   local url="$1" tag="$2" name="$3"
@@ -77,7 +76,7 @@ c = '$CC'
 cpp = '$CXX'
 ar = '$AR'
 strip = '$STRIP'
-pkg-config = '/usr/bin/pkg-config'
+pkgconfig = '/usr/bin/pkg-config'
 
 [properties]
 sys_root = '$SYSROOT'
@@ -127,12 +126,13 @@ mkdir -p "$QEMU_BUILD"
   --cc="$CC" --cxx="$CXX" --host-cc=cc \
   --extra-cflags="-O2 -fPIC -I$PREFIX/include" \
   --extra-ldflags="-L$PREFIX/lib -Wl,-rpath-link,$PREFIX/lib" \
-  --disable-docs --disable-tools --disable-guest-agent \
-  --disable-gtk --disable-sdl --disable-vnc --disable-slirp \
-  --disable-capstone --disable-curl --disable-libnfs \
-  --disable-spice --disable-usb-redir --disable-libusb \
-  --disable-opengl --disable-virglrenderer --disable-werror \
-  --disable-kvm --enable-tcg \
+  --disable-docs --disable-werror \
+  -Dtools=disabled -Dguest_agent=disabled \
+  -Dgtk=disabled -Dsdl=disabled -Dvnc=disabled -Dslirp=disabled \
+  -Dcapstone=disabled -Dcurl=disabled -Dlibnfs=disabled \
+  -Dspice=disabled -Dusb_redir=disabled -Dlibusb=disabled \
+  -Dopengl=disabled -Dvirglrenderer=disabled -Dkvm=disabled \
+  -Dtcg=enabled -Daudio_drv_list=[] \
   --with-pkgversion="NEXORA Android ARM64"
 
 echo "==> Compiling QEMU"
