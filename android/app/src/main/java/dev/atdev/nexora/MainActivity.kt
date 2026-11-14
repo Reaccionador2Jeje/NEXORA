@@ -666,6 +666,9 @@ class MainActivity : Activity() {
             registerReceiver(terminalReceiver, filter)
         }
         terminalReceiverRegistered = true
+        startService(Intent(this, TerminalExecutionService::class.java).apply {
+            action = TerminalExecutionService.ACTION_QUERY_QEMU_VM
+        })
     }
 
     // Keep the receiver registered while the Activity is stopped so progress
