@@ -21,7 +21,7 @@ def run_readelf(readelf: str, option: str, path: Path) -> str:
     ).stdout
 
 def needed_libraries(readelf: str, path: Path) -> list[str]:
-    return re.findall(r"Shared library: \\[(.+?)\\]", run_readelf(readelf, "-d", path))
+    return re.findall(r"Shared library: \[(.+?)\]", run_readelf(readelf, "-d", path))
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -38,7 +38,7 @@ def main() -> int:
     if not binary.is_file() or not lib_dir.is_dir():
         raise SystemExit("ERROR: QEMU binary or standalone library directory is missing")
     header = run_readelf(args.readelf, "-h", binary)
-    if not re.search(r"Machine:\\s+AArch64", header):
+    if not re.search(r"Machine:\s+AArch64", header):
         raise SystemExit("ERROR: QEMU is not an AArch64 ELF executable")
     phdr = run_readelf(args.readelf, "-l", binary)
     if "Requesting program interpreter: /system/bin/linker64" not in phdr:
