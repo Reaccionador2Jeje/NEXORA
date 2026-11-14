@@ -56,7 +56,6 @@ class TerminalExecutionService : Service() {
             return START_NOT_STICKY
         }
 
-        val installUbuntu = action == ACTION_INSTALL_UBUNTU
         val prepareQemuUbuntu = action == ACTION_PREPARE_QEMU_UBUNTU
         val startQemuVm = action == ACTION_START_QEMU_VM
         val command = intent?.getStringExtra(EXTRA_COMMAND)
@@ -64,15 +63,14 @@ class TerminalExecutionService : Service() {
         val hostname = intent?.getStringExtra(EXTRA_HOSTNAME) ?: "nexora"
         val uid = intent?.getIntExtra(EXTRA_UID, 10000) ?: 10000
         val treeUri = intent?.getStringExtra(EXTRA_TREE_URI)?.let(Uri::parse)
-        if (!installUbuntu && !prepareQemuUbuntu && !startQemuVm && command.isNullOrBlank()) {
+        if (!prepareQemuUbuntu && !startQemuVm && command.isNullOrBlank()) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
         createNotificationChannel()
         val taskLabel = when {
-            installUbuntu -> "Installing legacy Ubuntu userspace…"
-            prepareQemuUbuntu -> "Preparing Ubuntu 24.04 ARM64 VM…"
+            prepareQemuUbuntu -> "Installing QEMU and preparing Ubuntu 24.04 ARM64 VM…"
             startQemuVm -> "Starting Ubuntu virtual machine…"
             else -> "Running: $command"
         }
@@ -84,44 +82,18 @@ class TerminalExecutionService : Service() {
         }
 
         if (prepareQemuUbuntu) {
-            sendOutput("Preparing independent QEMU Ubuntu VM. The download is approximately 600 MB.")
-            Thread {
-                try {
-                    UbuntuVmInstaller(this).install(username, hostname) { message ->
-                        sendOutput(message)
-                        updateNotification(message)
-                    }
-                    finishQemuInstall(startId, true, "Ubuntu 24.04 ARM64 VM and boot media are ready.")
-                } catch (error: Exception) {
-                    finishQemuInstall(
-                        startId,
-                        false,
-                        error.message ?: "Could not prepare the QEMU Ubuntu VM."
-                    )
-                }
-            }.start()
+            sendOutput("Installing QEMU and preparing the independent Ubuntu ARM64 VM.")
+            LinuxRuntimeFactory.create(this).install(username, hostname, { message ->
+                sendOutput(message)
+                updateNotification(message)
+            }) { success, message, _ ->
+                finishQemuInstall(startId, success, message)
+            }
             return START_NOT_STICKY
         }
 
         if (startQemuVm) {
             startQemuVirtualMachine(startId)
-            return START_NOT_STICKY
-        }
-
-        if (installUbuntu) {
-            val password = intent?.getStringExtra(EXTRA_INSTALL_PASSWORD)
-            if (password.isNullOrEmpty()) {
-                sendOutput("Ubuntu installer: password is missing.")
-                finishInstall(startId, false, "Password missing", -1)
-                return START_NOT_STICKY
-            }
-            sendOutput("Legacy Ubuntu installation running in background.")
-            LinuxRuntimeFactory.create(this).install(username, password, { message ->
-                sendOutput(message)
-                updateNotification(message)
-            }) { success, message, installedUid ->
-                finishInstall(startId, success, message, installedUid)
-            }
             return START_NOT_STICKY
         }
 
@@ -223,19 +195,6 @@ class TerminalExecutionService : Service() {
         stopSelf(startId)
     }
 
-    private fun finishInstall(startId: Int, success: Boolean, message: String, uid: Int) {
-        sendBroadcast(Intent(ACTION_INSTALL_FINISHED).setPackage(packageName)
-            .putExtra(EXTRA_INSTALL_SUCCESS, success)
-            .putExtra(EXTRA_INSTALL_MESSAGE, message)
-            .putExtra(EXTRA_INSTALL_UID, uid))
-        getSystemService(NotificationManager::class.java).notify(
-            notificationId + 1,
-            buildNotification(if (success) "Ubuntu installed successfully" else "Ubuntu installation failed", false)
-        )
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf(startId)
-    }
-
     private fun finish(startId: Int, code: Int, treeUri: Uri?, bridge: AndroidFolderBridge) {
         try {
             if (treeUri != null) {
@@ -306,7 +265,6 @@ class TerminalExecutionService : Service() {
     }
 
     companion object {
-        const val ACTION_INSTALL_UBUNTU = "dev.atdev.nexora.INSTALL_UBUNTU"
         const val ACTION_PREPARE_QEMU_UBUNTU = "dev.atdev.nexora.PREPARE_QEMU_UBUNTU"
         const val ACTION_START_QEMU_VM = "dev.atdev.nexora.START_QEMU_VM"
         const val ACTION_STOP_QEMU_VM = "dev.atdev.nexora.STOP_QEMU_VM"
@@ -322,11 +280,6 @@ class TerminalExecutionService : Service() {
         const val EXTRA_QEMU_INSTALL_SUCCESS = "qemu_install_success"
         const val EXTRA_QEMU_INSTALL_MESSAGE = "qemu_install_message"
         const val EXTRA_QEMU_VM_EXIT = "qemu_vm_exit"
-        const val ACTION_INSTALL_FINISHED = "dev.atdev.nexora.INSTALL_FINISHED"
-        const val EXTRA_INSTALL_PASSWORD = "install_password"
-        const val EXTRA_INSTALL_SUCCESS = "install_success"
-        const val EXTRA_INSTALL_MESSAGE = "install_message"
-        const val EXTRA_INSTALL_UID = "install_uid"
         const val EXTRA_COMMAND = "command"
         const val EXTRA_USERNAME = "username"
         const val EXTRA_UID = "uid"
