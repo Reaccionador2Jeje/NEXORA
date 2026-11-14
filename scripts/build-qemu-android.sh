@@ -80,6 +80,8 @@ CC="$CC" AR="$AR" RANLIB="$RANLIB" CFLAGS="$CFLAGS" CPPFLAGS="$CPPFLAGS" LDFLAGS
   --disable-shared --enable-static
 make -j"$JOBS"
 make install
+test -f "$PREFIX/include/iconv.h"
+test -f "$PREFIX/lib/libiconv.a"
 
 echo "==> Building PCRE2 8-bit library for Android"
 cmake -S "$SRC/pcre2" -B "$BUILD/pcre2" \
@@ -104,6 +106,12 @@ pkg-config = '/usr/bin/pkg-config'
 [properties]
 sys_root = '$SYSROOT'
 pkg_config_libdir = ['$PREFIX/lib/pkgconfig', '$PREFIX/share/pkgconfig']
+
+[built-in options]
+c_args = ['-I$PREFIX/include']
+cpp_args = ['-I$PREFIX/include']
+c_link_args = ['-L$PREFIX/lib']
+cpp_link_args = ['-L$PREFIX/lib']
 
 [host_machine]
 system = 'android'
