@@ -13,8 +13,6 @@ import android.app.AlertDialog
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
@@ -29,21 +27,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
-import java.nio.charset.StandardCharsets
-import java.security.KeyStore
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
-import android.util.Base64
 
 /**
  * NEXORA Android terminal frontend.
- * This build stores the Ubuntu profile securely; the Ubuntu userspace/runtime
- * is a separate integration stage and is not falsely emulated by this screen.
+ * The Android terminal runs Ubuntu 24.04 ARM64 as a persistent QEMU virtual machine.
  */
 class MainActivity : Activity() {
     private lateinit var output: TextView
@@ -97,25 +87,6 @@ class MainActivity : Activity() {
                     input.isEnabled = true
                     val code = intent.getIntExtra(TerminalExecutionService.EXTRA_QEMU_VM_EXIT, 0)
                     appendLine("QEMU VM is stopped (exit $code).")
-                    promptLabel.text = prompt
-                    input.requestFocus()
-                }
-                TerminalExecutionService.ACTION_INSTALL_FINISHED -> {
-                    val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_INSTALL_SUCCESS, false)
-                    val message = intent.getStringExtra(TerminalExecutionService.EXTRA_INSTALL_MESSAGE).orEmpty()
-                    val uid = intent.getIntExtra(TerminalExecutionService.EXTRA_INSTALL_UID, -1)
-                    input.isEnabled = true
-                    if (success && uid > 0) {
-                        ubuntuUid = uid
-                        preferences.edit().putInt("ubuntu_uid", uid).apply()
-                        appendLine(message)
-                        appendLine("Ubuntu is ready. You can now run Linux commands.")
-                        updateRuntimeStatus()
-                    } else {
-                        appendLine("Ubuntu installation failed: $message")
-                        appendLine("Run install-ubuntu again to resume/retry.")
-                        updateRuntimeStatus()
-                    }
                     promptLabel.text = prompt
                     input.requestFocus()
                 }
@@ -651,9 +622,6 @@ class MainActivity : Activity() {
         val filter = IntentFilter().apply {
             addAction(TerminalExecutionService.ACTION_OUTPUT)
             addAction(TerminalExecutionService.ACTION_FINISHED)
-            // Without this action the UI never receives the install result,
-            // leaving the prompt disabled and hiding the actual failure.
-            addAction(TerminalExecutionService.ACTION_INSTALL_FINISHED)
             addAction(TerminalExecutionService.ACTION_QEMU_INSTALL_FINISHED)
             addAction(TerminalExecutionService.ACTION_QEMU_VM_STARTED)
             addAction(TerminalExecutionService.ACTION_QEMU_VM_STOPPED)
@@ -690,25 +658,21 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(8), dp(22), 0)
         }
-        fun field(hintText: String, type: Int = InputType.TYPE_CLASS_TEXT): EditText =
+        fun field(hintText: String): EditText =
             EditText(this).apply {
                 hint = hintText
-                inputType = type
+                inputType = InputType.TYPE_CLASS_TEXT
                 setSingleLine(true)
             }
 
         val userField = field("Username (e.g. cris)")
         val hostField = field("Hostname (e.g. nexora)")
-        val passwordField = field("Ubuntu password", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
-        val confirmField = field("Confirm password", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         panel.addView(userField)
         panel.addView(hostField)
-        panel.addView(passwordField)
-        panel.addView(confirmField)
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Configure Ubuntu session")
-            .setMessage("Create the Linux user that NEXORA will provision in its Ubuntu environment.")
+            .setTitle("Configure Ubuntu VM")
+            .setMessage("Choose the Linux username and hostname for your QEMU-powered Ubuntu environment.")
             .setView(panel)
             .setCancelable(false)
             .setPositiveButton("Create profile", null)
@@ -717,62 +681,28 @@ class MainActivity : Activity() {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val user = userField.text.toString().trim().lowercase(Locale.ROOT)
                 val host = hostField.text.toString().trim().lowercase(Locale.ROOT)
-                val password = passwordField.text.toString()
-                val confirmation = confirmField.text.toString()
-                val validName = Regex("^[a-z_][a-z0-9_-]{0,31}$")
                 when {
-                    !validName.matches(user) -> userField.error = "Use 1–32 chars: a-z, 0-9, _ or -"
-                    !Regex("^[a-z0-9][a-z0-9-]{0,62}$").matches(host) -> hostField.error = "Invalid hostname"
-                    password.length < 8 -> passwordField.error = "Use at least 8 characters"
-                    password != confirmation -> confirmField.error = "Passwords do not match"
+                    !Regex("^[a-z_][a-z0-9_-]{0,31}$").matches(user) ->
+                        userField.error = "Use 1–32 chars: a-z, 0-9, _ or -"
+                    !Regex("^[a-z0-9][a-z0-9-]{0,62}$").matches(host) ->
+                        hostField.error = "Invalid hostname"
                     else -> {
-                        try {
-                            // The password is encrypted with an Android Keystore key, never stored as plain text.
-                            preferences.edit()
-                                .putString("ubuntu_username", user)
-                                .putString("ubuntu_hostname", host)
-                                .putString("ubuntu_password_enc", encryptPassword(password))
-                                .putBoolean("ubuntu_profile_configured", true)
-                                .apply()
-                            username = user
-                            hostname = host
-                            promptLabel.text = prompt
-                            dialog.dismiss()
-                            printWelcome()
-                        } catch (error: Exception) {
-                            Toast.makeText(this, "Could not secure the password: ${error.message}", Toast.LENGTH_LONG).show()
-                        }
+                        preferences.edit()
+                            .putString("ubuntu_username", user)
+                            .putString("ubuntu_hostname", host)
+                            .remove("ubuntu_password_enc")
+                            .putBoolean("ubuntu_profile_configured", true)
+                            .apply()
+                        username = user
+                        hostname = host
+                        promptLabel.text = prompt
+                        dialog.dismiss()
+                        printWelcome()
                     }
                 }
             }
         }
         dialog.show()
-    }
-
-    private fun encryptPassword(password: String): String {
-        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        val alias = "nexora_ubuntu_password_key"
-        val key = if (keyStore.containsAlias(alias)) {
-            (keyStore.getKey(alias, null) as SecretKey)
-        } else {
-            val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-            generator.init(
-                KeyGenParameterSpec.Builder(
-                    alias,
-                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-                )
-                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                    .setRandomizedEncryptionRequired(true)
-                    .build()
-            )
-            generator.generateKey()
-        }
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key)
-        val encrypted = cipher.doFinal(password.toByteArray(StandardCharsets.UTF_8))
-        val payload = cipher.iv + encrypted
-        return Base64.encodeToString(payload, Base64.NO_WRAP)
     }
 
     private fun printWelcome() {
@@ -782,12 +712,8 @@ class MainActivity : Activity() {
         appendLine("Home: /home/$username")
         appendLine("Your Terminal. Your Universe.")
         appendLine("")
-        if (ubuntuRuntime.isInstalled()) {
-            appendLine("Legacy PRoot fallback: READY")
-        } else {
-            appendLine("Legacy PRoot fallback: NOT INSTALLED")
-        }
-        appendLine("Independent Ubuntu VM: run qemu-install, then qemu-start.")
+        appendLine("QEMU Ubuntu ARM64: ${if (ubuntuRuntime.isInstalled()) "READY" else "NOT INSTALLED"}")
+        appendLine("Run install-ubuntu to prepare the VM, then qemu-start to boot it.")
         appendLine("Type 'help' to see available commands.")
         promptLabel.text = prompt
         updateRuntimeStatus()
@@ -813,16 +739,15 @@ class MainActivity : Activity() {
 
         when (command) {
             "help" -> {
-                appendLine("NEXORA: help, version, clear, qemu-check, qemu-install, qemu-start, qemu-stop, qemu-status, exit")
-                appendLine("Legacy fallback: legacy-install-ubuntu, legacy-ubuntu-status (aliases: install-ubuntu, ubuntu-status)")
-                appendLine("Ubuntu commands: git, apt, bash, python3, ls, cd, pwd, cat, nano, etc.")
+                appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, qemu-check, qemu-install, qemu-start, qemu-stop, qemu-status, exit")
+                appendLine("Ubuntu shell commands are available after qemu-start boots the VM.")
             }
             "version" -> appendLine("NEXORA Android 0.3.0")
             "clear", "cls" -> output.text = ""
-            "install-ubuntu", "legacy-install-ubuntu" -> installUbuntuRuntime()
-            "ubuntu-status", "legacy-ubuntu-status" -> appendLine(
-                if (ubuntuRuntime.isInstalled()) "Legacy PRoot Ubuntu fallback: installed"
-                else "Legacy PRoot Ubuntu fallback: not installed."
+            "install-ubuntu", "qemu-install" -> installUbuntuRuntime()
+            "ubuntu-status" -> appendLine(
+                if (ubuntuRuntime.isInstalled()) "QEMU Ubuntu ARM64 VM: prepared"
+                else "QEMU Ubuntu ARM64 VM: not installed"
             )
             "qemu-check" -> checkQemuRuntime()
             "qemu-install" -> installQemuVm()
@@ -845,7 +770,7 @@ class MainActivity : Activity() {
                 if (qemuVmActive) {
                     sendQemuInput(line)
                 } else if (!ubuntuRuntime.isInstalled()) {
-                    appendLine("Ubuntu runtime is not installed. Run install-ubuntu first.")
+                    appendLine("QEMU Ubuntu VM is not prepared. Run install-ubuntu, then qemu-start.")
                 } else {
                     input.isEnabled = false
                     val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
@@ -962,7 +887,7 @@ class MainActivity : Activity() {
                     appendLine("QEMU Android runtime: VERIFIED")
                     appendLine(version)
                     appendLine("The executable and its Android shared libraries start correctly.")
-                    appendLine("Ubuntu VM boot is a separate stage and is not enabled yet.")
+                    appendLine("QEMU is verified. Run install-ubuntu to prepare Ubuntu, then qemu-start.")
                 }.onFailure { error ->
                     appendLine("QEMU runtime check failed: ${error.message ?: "unknown error"}")
                 }
@@ -975,47 +900,24 @@ class MainActivity : Activity() {
 
     private fun installUbuntuRuntime() {
         if (ubuntuRuntime.isInstalled()) {
-            appendLine("Ubuntu runtime is already installed.")
+            appendLine("QEMU Ubuntu VM is already prepared. Run qemu-start.")
             return
         }
-        val encrypted = preferences.getString("ubuntu_password_enc", null)
-        if (encrypted.isNullOrBlank()) {
-            appendLine("Ubuntu password is missing. Reconfigure the profile.")
-            return
-        }
-        val password = try {
-            decryptPassword(encrypted)
-        } catch (error: Exception) {
-            appendLine("Could not unlock Ubuntu password: ${error.message}")
-            return
-        }
-        appendLine("Starting Ubuntu 24.04 LTS installation in background…")
-        appendLine("You can switch apps; keep the NEXORA notification active.")
+        appendLine("Starting QEMU installation and Ubuntu 24.04 ARM64 preparation…")
+        appendLine("The first setup downloads the official Ubuntu cloud image; keep enough free storage.")
         input.isEnabled = false
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_INSTALL_UBUNTU
+            action = TerminalExecutionService.ACTION_PREPARE_QEMU_UBUNTU
             putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
-            putExtra(TerminalExecutionService.EXTRA_INSTALL_PASSWORD, password)
+            putExtra(TerminalExecutionService.EXTRA_HOSTNAME, hostname)
         }
         try {
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
             else startService(serviceIntent)
         } catch (error: Exception) {
             input.isEnabled = true
-            appendLine("Could not start Ubuntu background installer: ${error.message}")
+            appendLine("Could not start QEMU installer: ${error.message}")
         }
-    }
-
-    private fun decryptPassword(encoded: String): String {
-        val payload = Base64.decode(encoded, Base64.NO_WRAP)
-        require(payload.size > 12) { "Invalid encrypted password" }
-        val iv = payload.copyOfRange(0, 12)
-        val ciphertext = payload.copyOfRange(12, payload.size)
-        val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        val key = keyStore.getKey("nexora_ubuntu_password_key", null) as SecretKey
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
-        return String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)
     }
 
     private fun handleShortcut(key: String) {
