@@ -830,8 +830,10 @@ class MainActivity : Activity() {
             "qemu-stop" -> stopQemuVm()
             "qemu-status" -> {
                 val diskReady = File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile
+                val seedReady = File(filesDir, "qemu/vm/cidata.img").isFile
                 appendLine("QEMU VM: ${if (qemuVmActive) "RUNNING" else "STOPPED"}")
                 appendLine("Ubuntu ARM64 disk: ${if (diskReady) "prepared" else "not installed"}")
+                appendLine("NoCloud first-boot seed: ${if (seedReady) "prepared" else "missing"}")
             }
             "exit", "logout" -> if (qemuVmActive) stopQemuVm()
                 else appendLine("Legacy command execution uses isolated Ubuntu processes.")
@@ -866,7 +868,8 @@ class MainActivity : Activity() {
     }
 
     private fun installQemuVm() {
-        if (File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile) {
+        if (File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile &&
+            File(filesDir, "qemu/vm/cidata.img").isFile) {
             appendLine("Ubuntu QEMU VM is already prepared. Run qemu-start.")
             return
         }
