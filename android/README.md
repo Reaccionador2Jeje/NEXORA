@@ -1,32 +1,25 @@
 # NEXORA Android
 
-Native Android frontend prototype.
+Native Android terminal powered by a standalone ARM64 Ubuntu virtual machine.
 
 ## Open and build
-Open this directory in Android Studio with JDK 17 and Android SDK Platform 35.
-With Gradle 8.9 installed, run:
 
-```bash
-gradle assembleDebug
-```
+Open this directory in Android Studio with JDK 17 and Android SDK Platform 35. The distributable APK must be built by the GitHub Actions pipeline so it includes the verified Android/Bionic QEMU runtime and matching AAVMF firmware.
 
-The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
+## QEMU Ubuntu runtime
 
-## Runtime migration status
+QEMU System Emulation is the only active Android Linux engine. PRoot is no longer downloaded, packaged, or selected by the Android installer.
 
-NEXORA is moving from the legacy PRoot-based Ubuntu userspace to a full ARM64 virtual machine using QEMU System Emulation. The standalone Android NDK build, QEMU asset packaging, UEFI firmware, Ubuntu cloud-image installer, NoCloud first-boot seed, and serial VM controller are being integrated.
+The build pipeline works in two stages:
+1. **Build QEMU for Android ARM64** with the official Android NDK and package its shared libraries plus AAVMF UEFI firmware.
+2. **Android CI** downloads that exact workflow artifact, verifies its checksums, places the runtime in APK assets, runs the Android unit tests, and builds the debug APK.
 
-**Current status:** the active legacy command engine remains PRoot as a safe fallback. QEMU is experimental until its standalone build succeeds, the resulting APK passes the on-device `qemu-check`, and Ubuntu 24.04 reaches a working serial shell on a physical ARM64 Android device. The QEMU workflow hands its verified artifact to Android CI, which packages the runtime into a follow-up APK.
+The terminal commands are:
+- `qemu-check`: extract and verify QEMU, its shared libraries, and Android linker startup.
+- `install-ubuntu` (alias: `qemu-install`): install the bundled QEMU runtime, download and verify the official Ubuntu 24.04 ARM64 cloud disk, and prepare UEFI plus NoCloud first-boot media.
+- `qemu-start` / `qemu-stop`: start or stop the persistent headless VM.
+- `qemu-status` / `ubuntu-status`: show runtime and VM preparation state.
 
-In an APK containing the QEMU artifact, the terminal commands are:
-- `qemu-check`: verify the extracted Android executable, checksum manifest, and Bionic linker startup.
-- `qemu-install`: download and verify the official Ubuntu 24.04 ARM64 cloud disk, then prepare UEFI and first-boot seed media.
-- `qemu-start` / `qemu-stop`: start or stop the headless VM.
-- `qemu-status`: show VM and boot-media preparation state.
+After `qemu-start`, the terminal input and output are connected to Ubuntu's serial console. The initial VM build has networking disabled. A successful APK build verifies packaging and compilation; Ubuntu boot and persistence must still be tested on a physical ARM64 Android device.
 
-These commands do not imply that Ubuntu has booted successfully. Networking is not enabled in the initial QEMU build. See [`../docs/QEMU_ANDROID_MIGRATION.md`](../docs/QEMU_ANDROID_MIGRATION.md).
-
-## Current scope
-The app provides a terminal-style native interface with `help`, `version`, `clear`, `echo`, `pwd`, `ls`, `cd`, `date`, and `exit`.
-
-Filesystem commands are restricted to the app-private files directory. Arbitrary shell execution is disabled. This first Kotlin prototype does not yet call the shared Rust `nexora-core`; JNI integration is the next engineering step.
+See [the QEMU Android architecture and acceptance criteria](../docs/QEMU_ANDROID_MIGRATION.md).
