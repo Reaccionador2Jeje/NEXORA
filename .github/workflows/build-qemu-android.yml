@@ -28,6 +28,15 @@ jobs:
           ref: master
           path: third_party/termux-packages
 
+      - name: Install Android SDK and NDK required by Termux
+        working-directory: third_party/termux-packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/setup-android-sdk.sh
+          test -d "$NDK"
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" -o -x "$ANDROID_HOME/cmdline-tools/bin/sdkmanager"
+
       - name: Build Android AArch64 QEMU package
         working-directory: third_party/termux-packages
         shell: bash
