@@ -149,6 +149,12 @@ python3 "$ROOT/scripts/package-qemu-android.py" \
   --readelf "$TOOLCHAIN/llvm-readelf"
 
 cp "$WORK/android-aarch64.ini" "$ROOT/artifacts/qemu-android-arm64/"
+mkdir -p "$ROOT/artifacts/qemu-android-arm64/licenses"
+for project in qemu libffi pcre2 glib pixman; do
+  find "$SRC/$project" -maxdepth 1 -type f \
+    \( -iname 'COPYING*' -o -iname 'LICENSE*' -o -iname 'LICENCE*' \) \
+    -exec cp -n {} "$ROOT/artifacts/qemu-android-arm64/licenses/" \;
+done
 git -C "$WORK/src/qemu" rev-parse HEAD > "$ROOT/artifacts/qemu-android-arm64/QEMU_COMMIT.txt"
 printf 'NDK=r30\nAPI=%s\nABI=arm64-v8a\n' "$API" > "$ROOT/artifacts/qemu-android-arm64/BUILD_INFO.txt"
 echo "QEMU Android ARM64 candidate built and staged."
