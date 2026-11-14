@@ -29,6 +29,9 @@ export CFLAGS="-O2 -fPIC"
 export CXXFLAGS="-O2 -fPIC"
 export CPPFLAGS="-I$PREFIX/include"
 export LDFLAGS="-L$PREFIX/lib -Wl,-z,relro -Wl,-z,now"
+# QEMU's configure script derives a target-prefixed pkg-config from --cross-prefix
+# unless PKG_CONFIG is explicit. Use the host pkg-config with target-only search paths.
+export PKG_CONFIG="/usr/bin/pkg-config"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
 export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
 
