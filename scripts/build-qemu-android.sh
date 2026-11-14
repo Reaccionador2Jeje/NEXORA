@@ -54,11 +54,11 @@ echo "==> Building libffi for Android"
 cd "$SRC/libffi"
 mkdir -p "$BUILD/libffi"
 cd "$BUILD/libffi"
-"$SRC/libffi/configure" \
+CC="$CC" AR="$AR" RANLIB="$RANLIB" CFLAGS="$CFLAGS" \
+  "$SRC/libffi/configure" \
   --host=aarch64-linux-android \
-  --disable-shared --enable-static --with-pic \
-  CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-  CFLAGS="$CFLAGS"
+  --prefix="$PREFIX" \
+  --disable-shared --enable-static --with-pic
 make -j"$JOBS"
 make install
 
