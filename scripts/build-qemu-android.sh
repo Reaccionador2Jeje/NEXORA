@@ -100,7 +100,7 @@ meson setup "$BUILD/glib" "$SRC/glib" \
   -Dtests=false -Dinstalled_tests=false -Dintrospection=disabled \
   -Ddocumentation=false -Dman-pages=disabled \
   -Dlibmount=disabled -Dselinux=disabled -Dlibelf=disabled \
-  -Dlibffi=enabled -Dpcre2=enabled -Dsysprof=disabled
+  -Dsysprof=disabled
 meson compile -C "$BUILD/glib" --jobs "$JOBS"
 meson install -C "$BUILD/glib"
 
