@@ -124,7 +124,6 @@ cd "$WORK/src/qemu"
 QEMU_BUILD="$BUILD/qemu"
 mkdir -p "$QEMU_BUILD"
 ./configure \
-  --prefix="$PREFIX" \
   --target-list=aarch64-softmmu \
   --cross-prefix="$TOOLCHAIN/aarch64-linux-android-" \
   --cc="$CC" --cxx="$CXX" --host-cc=cc \
