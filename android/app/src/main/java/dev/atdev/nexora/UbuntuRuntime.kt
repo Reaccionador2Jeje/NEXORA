@@ -14,14 +14,14 @@ import java.util.Locale
 import java.util.zip.ZipInputStream
 
 /** Rootless Ubuntu 24.04 userspace installer and command runner. */
-class UbuntuRuntime(context: Context) {
+class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val app = context.applicationContext
     private val base = File(app.filesDir, "ubuntu")
     private val root = File(base, "rootfs")
     // Android permits execution of APK-extracted native libraries; writable filesDir may be mounted noexec.
     private val proot = File(app.applicationInfo.nativeLibraryDir, "libproot.so")
 
-    fun isInstalled(): Boolean =
+    override fun isInstalled(): Boolean =
         proot.canExecute() && isRootfsExecutable()
 
     private fun isRootfsExecutable(): Boolean {
@@ -47,7 +47,7 @@ class UbuntuRuntime(context: Context) {
         }
     }
 
-    fun install(user: String, password: String, progress: (String) -> Unit, done: (Boolean, String, Int) -> Unit) {
+    override fun install(user: String, password: String, progress: (String) -> Unit, done: (Boolean, String, Int) -> Unit) {
         Thread {
             try {
                 base.mkdirs()
@@ -80,7 +80,7 @@ class UbuntuRuntime(context: Context) {
         }.start()
     }
 
-    fun execute(command: String, user: String, uid: Int, androidShared: File? = null, line: (String) -> Unit, done: (Int) -> Unit) {
+    override fun execute(command: String, user: String, uid: Int, androidShared: File? = null, line: (String) -> Unit, done: (Int) -> Unit) {
         Thread {
             var code = 1
             try {
