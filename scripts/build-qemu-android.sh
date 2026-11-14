@@ -132,7 +132,7 @@ mkdir -p "$QEMU_BUILD"
   -Dcapstone=disabled -Dcurl=disabled -Dlibnfs=disabled \
   -Dspice=disabled -Dusb_redir=disabled -Dlibusb=disabled \
   -Dopengl=disabled -Dvirglrenderer=disabled -Dkvm=disabled \
-  -Dtcg=enabled -Dpixman=enabled -Dfdt=internal \\
+  -Dtcg=enabled -Dpixman=enabled -Dfdt=internal \
   -Daudio_drv_list=[] -Dpkgversion=NEXORA-Android-ARM64
 
 echo "==> Compiling QEMU"
@@ -151,9 +151,10 @@ python3 "$ROOT/scripts/package-qemu-android.py" \
 cp "$WORK/android-aarch64.ini" "$ROOT/artifacts/qemu-android-arm64/"
 mkdir -p "$ROOT/artifacts/qemu-android-arm64/licenses"
 for project in qemu libffi pcre2 glib pixman; do
+  mkdir -p "$ROOT/artifacts/qemu-android-arm64/licenses/$project"
   find "$SRC/$project" -maxdepth 1 -type f \
     \( -iname 'COPYING*' -o -iname 'LICENSE*' -o -iname 'LICENCE*' \) \
-    -exec cp -n {} "$ROOT/artifacts/qemu-android-arm64/licenses/" \;
+    -exec cp -n {} "$ROOT/artifacts/qemu-android-arm64/licenses/$project/" \;
 done
 git -C "$WORK/src/qemu" rev-parse HEAD > "$ROOT/artifacts/qemu-android-arm64/QEMU_COMMIT.txt"
 printf 'NDK=r30\nAPI=%s\nABI=arm64-v8a\n' "$API" > "$ROOT/artifacts/qemu-android-arm64/BUILD_INFO.txt"
