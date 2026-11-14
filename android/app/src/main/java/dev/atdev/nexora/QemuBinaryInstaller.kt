@@ -5,6 +5,7 @@ import android.os.Build
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.util.zip.GZIPInputStream
 import java.security.MessageDigest
 
 /** Extracts and verifies the standalone Android/Bionic QEMU bundle shipped in the APK. */
@@ -12,6 +13,11 @@ class QemuBinaryInstaller(private val context: Context) {
     data class InstalledQemu(
         val executable: File,
         val libraryDirectory: File
+    )
+
+    data class InstalledFirmware(
+        val code: File,
+        val varsTemplate: File
     )
 
     @Synchronized
@@ -71,6 +77,72 @@ class QemuBinaryInstaller(private val context: Context) {
             staging.deleteRecursively()
             throw error
         }
+    }
+
+    /** Extracts the matching AAVMF UEFI pair included by the QEMU build workflow. */
+    @Synchronized
+    fun installFirmwareFromAssets(): InstalledFirmware {
+        val assetPath = "qemu/arm64-v8a/firmware"
+        val names = context.assets.list(assetPath)?.toSet().orEmpty()
+        check("AAVMF_CODE.fd.gz" in names && "AAVMF_VARS.fd.gz" in names && "SHA256SUMS" in names) {
+            "The ARM64 UEFI firmware is not included in this APK."
+        }
+
+        val parent = File(context.filesDir, "qemu/firmware")
+        check(parent.exists() || parent.mkdirs()) { "Cannot create the private firmware directory." }
+        val staging = File(parent, "installing")
+        val destination = File(parent, "aavmf")
+        staging.deleteRecursively()
+        check(staging.mkdirs()) { "Cannot prepare the UEFI firmware directory." }
+        try {
+            for (name in listOf("AAVMF_CODE.fd.gz", "AAVMF_VARS.fd.gz", "SHA256SUMS")) {
+                context.assets.open("$assetPath/$name").use { input ->
+                    FileOutputStream(File(staging, name)).use { output -> input.copyTo(output) }
+                }
+            }
+            verifyChecksums(staging)
+            for (name in listOf("AAVMF_CODE.fd", "AAVMF_VARS.fd")) {
+                GZIPInputStream(File(staging, "$name.gz").inputStream()).use { input ->
+                    FileOutputStream(File(staging, name)).use { output -> input.copyTo(output) }
+                }
+                check(File(staging, name).length() >= 1024L * 1024L) {
+                    "UEFI firmware image is unexpectedly small: $name"
+                }
+            }
+            val previous = File(parent, "aavmf.previous")
+            previous.deleteRecursively()
+            if (destination.exists()) {
+                check(destination.renameTo(previous)) { "Cannot replace the previous UEFI firmware safely." }
+            }
+            if (!staging.renameTo(destination)) {
+                if (previous.exists()) previous.renameTo(destination)
+                error("Cannot activate the verified UEFI firmware.")
+            }
+            previous.deleteRecursively()
+            return InstalledFirmware(
+                File(destination, "AAVMF_CODE.fd"),
+                File(destination, "AAVMF_VARS.fd")
+            )
+        } catch (error: Exception) {
+            staging.deleteRecursively()
+            throw error
+        }
+    }
+
+    /** Creates or reuses the writable UEFI variable store for the persistent VM. */
+    fun prepareWritableFirmwareVars(firmware: InstalledFirmware): File {
+        val vmDirectory = File(context.filesDir, "qemu/vm")
+        check(vmDirectory.exists() || vmDirectory.mkdirs()) { "Cannot create the VM directory." }
+        val writable = File(vmDirectory, "AAVMF_VARS.fd")
+        if (!writable.exists()) {
+            FileInputStream(firmware.varsTemplate).use { input ->
+                FileOutputStream(writable).use { output -> input.copyTo(output) }
+            }
+        }
+        check(writable.isFile && writable.length() == firmware.varsTemplate.length()) {
+            "The writable UEFI variable store is incomplete."
+        }
+        return writable
     }
 
     /** Starts QEMU's version probe with its private library path; this does not boot a VM. */
