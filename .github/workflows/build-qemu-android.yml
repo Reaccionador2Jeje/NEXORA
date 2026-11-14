@@ -1,0 +1,74 @@
+name: Build QEMU for Android ARM64
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-qemu-android.yml"
+      - "scripts/package-qemu-android.py"
+
+permissions:
+  contents: read
+
+jobs:
+  build-qemu:
+    name: Build QEMU System AArch64 for Android
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/termux/package-builder:latest
+    steps:
+      - name: Check out NEXORA
+        uses: actions/checkout@v4
+
+      - name: Check out Termux package build system
+        uses: actions/checkout@v4
+        with:
+          repository: termux/termux-packages
+          ref: master
+          path: third_party/termux-packages
+
+      - name: Build Android AArch64 QEMU package
+        working-directory: third_party/termux-packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./build-package.sh -I -j2 qemu-system-x86-64-headless
+
+      - name: Stage QEMU executable and Android shared libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREFIX="/data/data/com.termux/files/usr"
+          QEMU_BIN="$PREFIX/bin/qemu-system-aarch64"
+          test -x "$QEMU_BIN"
+          mkdir -p dist/qemu-runtime-arm64
+          python3 scripts/package-qemu-android.py \
+            --binary "$QEMU_BIN" \
+            --prefix "$PREFIX" \
+            --output dist/qemu-runtime-arm64/lib
+          install -m 0755 "$QEMU_BIN" dist/qemu-runtime-arm64/qemu-system-aarch64
+          cp third_party/termux-packages/packages/qemu-system-x86-64-headless/build.sh dist/qemu-runtime-arm64/TERMUX_BUILD_RECIPE.sh
+          {
+            echo "QEMU source version: $(grep '^TERMUX_PKG_VERSION=' third_party/termux-packages/packages/qemu-system-x86-64-headless/build.sh | cut -d= -f2-)"
+            echo "Termux package repository: https://github.com/termux/termux-packages"
+            echo "Host ABI target: arm64-v8a / Android Bionic"
+            echo "Guest system target: aarch64-softmmu"
+          } > dist/qemu-runtime-arm64/BUILD_INFO.txt
+
+      - name: Verify staged ELF and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          readelf -h dist/qemu-runtime-arm64/qemu-system-aarch64 | grep -E 'Class:|Machine:'
+          readelf -l dist/qemu-runtime-arm64/qemu-system-aarch64 | grep 'Requesting program interpreter'
+          test -s dist/qemu-runtime-arm64/qemu-system-aarch64
+          test -n "$(find dist/qemu-runtime-arm64/lib -maxdepth 1 -type f -name '*.so*' -print -quit)"
+
+      - name: Upload QEMU Android ARM64 runtime candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexora-qemu-android-arm64-candidate
+          path: dist/qemu-runtime-arm64/
+          if-no-files-found: error
+          retention-days: 14
