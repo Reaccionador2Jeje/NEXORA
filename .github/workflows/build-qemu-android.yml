@@ -31,7 +31,7 @@ jobs:
           sudo apt-get install -y \
             autoconf automake bc bison build-essential cmake curl flex git \
             libtool meson ninja-build \
-            pkg-config python3 python3-pip python3-venv unzip wget
+            pkg-config python3 python3-pip python3-venv qemu-efi-aarch64 unzip wget
 
       - name: Install official Android NDK
         shell: bash
@@ -85,6 +85,22 @@ jobs:
           mv qemu-src "$RUNNER_TEMP/nexora-qemu/src/qemu"
           QEMU_WORK_DIR="$RUNNER_TEMP/nexora-qemu" \
             BUILD_JOBS=2 bash scripts/build-qemu-android.sh
+
+      - name: Package matching ARM64 UEFI firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          firmware="artifacts/qemu-android-arm64/firmware"
+          mkdir -p "$firmware" artifacts/qemu-android-arm64/licenses/edk2
+          test -s /usr/share/AAVMF/AAVMF_CODE.fd
+          test -s /usr/share/AAVMF/AAVMF_VARS.fd
+          gzip -n -9 -c /usr/share/AAVMF/AAVMF_CODE.fd > "$firmware/AAVMF_CODE.fd.gz"
+          gzip -n -9 -c /usr/share/AAVMF/AAVMF_VARS.fd > "$firmware/AAVMF_VARS.fd.gz"
+          cp /usr/share/doc/qemu-efi-aarch64/copyright artifacts/qemu-android-arm64/licenses/edk2/
+          (
+            cd "$firmware"
+            sha256sum AAVMF_CODE.fd.gz AAVMF_VARS.fd.gz > SHA256SUMS
+          )
 
       - name: Upload standalone QEMU ARM64 candidate
         uses: actions/upload-artifact@v4
