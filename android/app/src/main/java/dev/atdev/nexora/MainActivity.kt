@@ -368,14 +368,6 @@ class MainActivity : Activity() {
         }
         panel.addView(accountLabel)
 
-        val googleLogin = makeActionButton("G  CONTINUE WITH GOOGLE", 0xFF071827.toInt(), 0xFFBBDDF5.toInt(), true) {
-            decor.removeView(overlay)
-            startProviderLogin("google")
-        }
-        val googleParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
-        googleParams.topMargin = dp(8)
-        panel.addView(googleLogin, googleParams)
-
         val githubLogin = makeActionButton("⌘  CONTINUE WITH GITHUB", 0xFFFFFFFF.toInt(), 0xFF26364E.toInt(), false) {
             decor.removeView(overlay)
             startProviderLogin("github")
