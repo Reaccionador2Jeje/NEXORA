@@ -27,7 +27,8 @@ mkdir -p "$SRC" "$BUILD" "$PREFIX"
 export CC CXX AR RANLIB STRIP
 export CFLAGS="-O2 -fPIC"
 export CXXFLAGS="-O2 -fPIC"
-export LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+export CPPFLAGS="-I$PREFIX/include"
+export LDFLAGS="-L$PREFIX/lib -Wl,-z,relro -Wl,-z,now"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
 export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig:$PREFIX/share/pkgconfig"
 
@@ -46,6 +47,13 @@ curl --fail --location --retry 3 \
 echo "bc9842a18898bfacb0ed1252c4febcc7e78fa139fd27fdc7a3e30d9d9356119b  $LIBFFI_ARCHIVE" | sha256sum --check -
 tar -xzf "$LIBFFI_ARCHIVE" -C "$SRC"
 mv "$SRC/libffi-3.4.8" "$SRC/libffi"
+ICONV_ARCHIVE="$WORK/libiconv-1.18.tar.gz"
+curl --fail --location --retry 3 \
+  https://ftp.gnu.org/gnu/libiconv/libiconv-1.18.tar.gz \
+  -o "$ICONV_ARCHIVE"
+echo "3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8  $ICONV_ARCHIVE" | sha256sum --check -
+tar -xzf "$ICONV_ARCHIVE" -C "$SRC"
+mv "$SRC/libiconv-1.18" "$SRC/libiconv"
 clone_tag https://github.com/PCRE2Project/pcre2.git pcre2-10.45 pcre2
 clone_tag https://github.com/GNOME/glib.git 2.84.4 glib
 clone_tag https://gitlab.freedesktop.org/pixman/pixman.git pixman-0.46.4 pixman
@@ -59,6 +67,17 @@ CC="$CC" AR="$AR" RANLIB="$RANLIB" CFLAGS="$CFLAGS" \
   --host=aarch64-linux-android \
   --prefix="$PREFIX" \
   --disable-shared --enable-static --with-pic
+make -j"$JOBS"
+make install
+
+echo "==> Building GNU libiconv for Android API $API"
+mkdir -p "$BUILD/libiconv"
+cd "$BUILD/libiconv"
+CC="$CC" AR="$AR" RANLIB="$RANLIB" CFLAGS="$CFLAGS" CPPFLAGS="$CPPFLAGS" LDFLAGS="$LDFLAGS" \
+  "$SRC/libiconv/configure" \
+  --host=aarch64-linux-android \
+  --prefix="$PREFIX" \
+  --disable-shared --enable-static
 make -j"$JOBS"
 make install
 
@@ -165,7 +184,7 @@ python3 "$ROOT/scripts/package-qemu-android.py" \
 
 cp "$WORK/android-aarch64.ini" "$ROOT/artifacts/qemu-android-arm64/"
 mkdir -p "$ROOT/artifacts/qemu-android-arm64/licenses"
-for project in qemu libffi pcre2 glib pixman; do
+for project in qemu libffi libiconv pcre2 glib pixman; do
   mkdir -p "$ROOT/artifacts/qemu-android-arm64/licenses/$project"
   find "$SRC/$project" -maxdepth 1 -type f \
     \( -iname 'COPYING*' -o -iname 'LICENSE*' -o -iname 'LICENCE*' \) \
