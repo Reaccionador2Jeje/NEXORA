@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: qemu-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   prepare:
     name: Prepare standalone Android toolchain
