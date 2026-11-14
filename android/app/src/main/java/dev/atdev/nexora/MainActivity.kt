@@ -57,7 +57,7 @@ class MainActivity : Activity() {
     private var historyIndex = 0
     private var username = "user"
     private var hostname = "nexora"
-    private lateinit var ubuntuRuntime: UbuntuRuntime
+    private lateinit var ubuntuRuntime: LinuxRuntimeEngine
     private var ubuntuUid = 10000
     private var terminalReceiverRegistered = false
 
@@ -103,7 +103,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ubuntuRuntime = UbuntuRuntime(this)
+        ubuntuRuntime = LinuxRuntimeFactory.create(this)
         ubuntuUid = preferences.getInt("ubuntu_uid", 10000)
         username = preferences.getString("ubuntu_username", "user") ?: "user"
         hostname = preferences.getString("ubuntu_hostname", "nexora") ?: "nexora"
