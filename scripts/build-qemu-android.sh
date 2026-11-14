@@ -80,7 +80,7 @@ c = '$CC'
 cpp = '$CXX'
 ar = '$AR'
 strip = '$STRIP'
-pkgconfig = '/usr/bin/pkg-config'
+pkg-config = '/usr/bin/pkg-config'
 
 [properties]
 sys_root = '$SYSROOT'
