@@ -29,6 +29,13 @@ class TerminalExecutionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
 
+        if (action == ACTION_QUERY_QEMU_VM) {
+            val running = qemuController?.isRunning == true
+            sendBroadcast(Intent(
+                if (running) ACTION_QEMU_VM_STARTED else ACTION_QEMU_VM_STOPPED
+            ).setPackage(packageName).putExtra(EXTRA_QEMU_VM_EXIT, 0))
+            return START_NOT_STICKY
+        }
         if (action == ACTION_QEMU_VM_INPUT) {
             val text = intent?.getStringExtra(EXTRA_QEMU_INPUT).orEmpty()
             try {
@@ -151,6 +158,11 @@ class TerminalExecutionService : Service() {
     }
 
     private fun startQemuVirtualMachine(startId: Int) {
+        if (qemuController?.isRunning == true) {
+            sendBroadcast(Intent(ACTION_QEMU_VM_STARTED).setPackage(packageName))
+            updateNotification("Ubuntu VM is running")
+            return
+        }
         Thread {
             try {
                 val installer = QemuBinaryInstaller(this)
@@ -298,6 +310,7 @@ class TerminalExecutionService : Service() {
         const val ACTION_START_QEMU_VM = "dev.atdev.nexora.START_QEMU_VM"
         const val ACTION_STOP_QEMU_VM = "dev.atdev.nexora.STOP_QEMU_VM"
         const val ACTION_QEMU_VM_INPUT = "dev.atdev.nexora.QEMU_VM_INPUT"
+        const val ACTION_QUERY_QEMU_VM = "dev.atdev.nexora.QUERY_QEMU_VM"
         const val ACTION_QEMU_INSTALL_FINISHED = "dev.atdev.nexora.QEMU_INSTALL_FINISHED"
         const val ACTION_QEMU_VM_STARTED = "dev.atdev.nexora.QEMU_VM_STARTED"
         const val ACTION_QEMU_VM_STOPPED = "dev.atdev.nexora.QEMU_VM_STOPPED"
