@@ -151,10 +151,11 @@ PKG_CONFIG_PATH="$PKG_CONFIG_PATH" pkg-config --modversion libffi
 PKG_CONFIG_PATH="$PKG_CONFIG_PATH" pkg-config --modversion libpcre2-8
 
 echo "==> Configuring upstream QEMU for Android"
-cd "$WORK/src/qemu"
+QEMU_SOURCE="$WORK/src/qemu"
 QEMU_BUILD="$BUILD/qemu"
 mkdir -p "$QEMU_BUILD"
-./configure \
+cd "$QEMU_BUILD"
+"$QEMU_SOURCE/configure" \
   --target-list=aarch64-softmmu \
   --cross-prefix="$TOOLCHAIN/aarch64-linux-android-" \
   --cc="$CC" --cxx="$CXX" --host-cc=cc \
