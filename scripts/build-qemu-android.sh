@@ -136,8 +136,8 @@ echo "==> Building Pixman for Android"
 meson setup "$BUILD/pixman" "$SRC/pixman" \
   --cross-file "$WORK/android-aarch64.ini" \
   --prefix "$PREFIX" --buildtype release --default-library static \
-  -Dtests=false -Ddemos=false -Dgtk=false \
-  -Dlibpng=false -Dopenmp=false
+  -Dtests=disabled -Ddemos=disabled -Dgtk=disabled \
+  -Dlibpng=disabled -Dopenmp=disabled
 meson compile -C "$BUILD/pixman" --jobs "$JOBS"
 meson install -C "$BUILD/pixman"
 
