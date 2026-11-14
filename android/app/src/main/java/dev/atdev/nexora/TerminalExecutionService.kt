@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import java.io.File
 
 /** Runs a user-started Ubuntu command while NEXORA is in the background. */
 class TerminalExecutionService : Service() {
