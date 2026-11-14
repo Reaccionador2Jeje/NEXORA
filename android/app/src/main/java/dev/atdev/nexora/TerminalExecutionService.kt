@@ -47,7 +47,7 @@ class TerminalExecutionService : Service() {
                 return START_NOT_STICKY
             }
             sendOutput("Ubuntu installation running in background. You can switch apps.")
-            UbuntuRuntime(this).install(username, password, { message ->
+            LinuxRuntimeFactory.create(this).install(username, password, { message ->
                 sendOutput(message)
                 updateNotification(message)
             }) { success, message, installedUid ->
@@ -68,7 +68,7 @@ class TerminalExecutionService : Service() {
                         prefs.edit().putString("android_tree_imported_uri", treeUri.toString()).apply()
                     }
                 }
-                UbuntuRuntime(this).execute(
+                LinuxRuntimeFactory.create(this).execute(
                     command.orEmpty(),
                     username,
                     uid,
