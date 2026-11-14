@@ -55,8 +55,8 @@ object NoCloudSeedImage {
         val fat = ByteArray(FAT_SECTORS * SECTOR_SIZE)
         setFat12(fat, 0, 0xFF0)
         setFat12(fat, 1, 0xFFF)
-        setFat12(fat, 2, 0xFFF)
-        setFat12(fat, 3, 0xFFF)
+        val userClusters = allocateClusters(fat, 2, userBytes.size)
+        val metaClusters = allocateClusters(fat, 2 + userClusters.size, metaBytes.size)
         copyIntoImage(image, SECTOR_SIZE, fat)
         copyIntoImage(image, SECTOR_SIZE * (1 + FAT_SECTORS), fat)
 
@@ -68,12 +68,12 @@ object NoCloudSeedImage {
         copyIntoImage(image, cursor, volume)
         cursor += 32
 
-        cursor = addRootFile(image, cursor, "user-data", "USERDA~1", 2, userBytes.size)
-        addRootFile(image, cursor, "meta-data", "METADA~1", 3, metaBytes.size)
+        cursor = addRootFile(image, cursor, "user-data", "USERDA~1", userClusters.first(), userBytes.size)
+        addRootFile(image, cursor, "meta-data", "METADA~1", metaClusters.first(), metaBytes.size)
 
         val dataOffset = SECTOR_SIZE * DATA_START_SECTOR
-        copyIntoImage(image, dataOffset, userBytes)
-        copyIntoImage(image, dataOffset + SECTOR_SIZE, metaBytes)
+        writeFileClusters(image, dataOffset, userClusters, userBytes)
+        writeFileClusters(image, dataOffset, metaClusters, metaBytes)
 
         target.parentFile?.let { check(it.exists() || it.mkdirs()) { "Cannot create cloud-init seed directory." } }
         FileOutputStream(target).use { it.write(image) }
@@ -145,6 +145,32 @@ object NoCloudSeedImage {
             sum = (((sum and 1) shl 7) + (sum ushr 1) + (byte.toInt() and 0xFF)) and 0xFF
         }
         return sum
+    }
+
+    private fun allocateClusters(fat: ByteArray, first: Int, size: Int): List<Int> {
+        val count = maxOf(1, (size + SECTOR_SIZE - 1) / SECTOR_SIZE)
+        val clusters = (first until first + count).toList()
+        clusters.forEachIndexed { index, cluster ->
+            val next = clusters.getOrNull(index + 1) ?: 0xFFF
+            setFat12(fat, cluster, next)
+        }
+        return clusters
+    }
+
+    private fun writeFileClusters(
+        image: ByteArray,
+        dataOffset: Int,
+        clusters: List<Int>,
+        bytes: ByteArray
+    ) {
+        var sourceOffset = 0
+        for (cluster in clusters) {
+            val count = minOf(SECTOR_SIZE, bytes.size - sourceOffset)
+            if (count <= 0) break
+            val targetOffset = dataOffset + (cluster - 2) * SECTOR_SIZE
+            copyIntoImage(image, targetOffset, bytes.copyOfRange(sourceOffset, sourceOffset + count))
+            sourceOffset += count
+        }
     }
 
     private fun setFat12(fat: ByteArray, cluster: Int, value: Int) {
