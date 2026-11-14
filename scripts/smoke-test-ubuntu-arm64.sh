@@ -60,6 +60,7 @@ qemu-system-aarch64 \
   -device virtio-blk-device,drive=system \
   -drive if=none,id=seed,format=raw,file="$WORK/seed.img" \
   -device virtio-blk-device,drive=seed \
+  -nic none \
   -display none \
   -serial "file:$SERIAL_LOG" \
   -monitor none \
