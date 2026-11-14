@@ -72,8 +72,11 @@ class QemuVmController(
 
             Thread({
                 try {
-                    child.inputStream.bufferedReader().useLines { lines ->
-                        lines.forEach { line -> onOutput(line) }
+                    val buffer = ByteArray(4096)
+                    while (true) {
+                        val count = child.inputStream.read(buffer)
+                        if (count < 0) break
+                        if (count > 0) onOutput(String(buffer, 0, count, Charsets.UTF_8))
                     }
                 } catch (error: Exception) {
                     onOutput("NEXORA QEMU output stream: ${error.message ?: "closed"}")
@@ -108,16 +111,9 @@ class QemuVmController(
     fun stop() {
         val child = process ?: return
         if (child.isAlive) {
-            try {
-                child.outputStream.write(byteArrayOf(0x04))
-                child.outputStream.flush()
-            } catch (_: Exception) {
-                // Destroy below if the guest does not shut down on EOF.
-            }
-            if (!child.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
-                child.destroy()
-            }
-            if (!child.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+            // SIGTERM lets QEMU close its block backends and flush the persistent QCOW2 disk.
+            child.destroy()
+            if (!child.waitFor(8, java.util.concurrent.TimeUnit.SECONDS)) {
                 child.destroyForcibly()
             }
         }
