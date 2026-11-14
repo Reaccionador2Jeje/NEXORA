@@ -69,7 +69,8 @@ class MainActivity : Activity() {
                     val message = intent.getStringExtra(TerminalExecutionService.EXTRA_QEMU_INSTALL_MESSAGE).orEmpty()
                     input.isEnabled = true
                     appendLine(if (success) message else "QEMU Ubuntu preparation failed: $message")
-                    if (success) appendLine("Run qemu-start to boot the independent Ubuntu virtual machine.")
+                    if (success) appendLine("Run qemu-start to boot the Ubuntu virtual machine.")
+                    updateRuntimeStatus()
                     promptLabel.text = prompt
                     input.requestFocus()
                 }
