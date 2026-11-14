@@ -22,6 +22,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -123,182 +124,102 @@ class MainActivity : Activity() {
     }
 
     private fun buildInterface() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(10))
+        // Main terminal workspace: compact controls at the top, console fills the rest.
+        val frame = FrameLayout(this).apply {
             setBackgroundColor(0xFF080D19.toInt())
         }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(7), dp(12), dp(10))
+        }
 
-        // Top bar: marca, versión y estado de conexión.
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(2), dp(4), dp(2), dp(14))
+            setPadding(dp(2), dp(2), dp(2), dp(7))
         }
-        val brandColumn = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val menuButton = TextView(this).apply {
+            text = "☰"
+            textSize = 23f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFB8D8F5.toInt())
+            background = roundedBackground(intArrayOf(0xFF172338.toInt(), 0xFF172338.toInt()), 12)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { openSideMenu() }
+        }
+        header.addView(menuButton, LinearLayout.LayoutParams(dp(42), dp(40)))
+        val brandColumn = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), 0, 0, 0)
+        }
         brandColumn.addView(TextView(this).apply {
             text = "NEXORA"
-            textSize = 25f
+            textSize = 19f
             letterSpacing = 0.08f
             typeface = Typeface.create("sans-serif-black", Typeface.NORMAL)
             setTextColor(0xFFEAF5FF.toInt())
         })
         brandColumn.addView(TextView(this).apply {
             text = "YOUR TERMINAL. YOUR UNIVERSE."
-            textSize = 9f
-            letterSpacing = 0.16f
+            textSize = 8f
+            letterSpacing = 0.12f
             setTextColor(0xFF7186A8.toInt())
         })
         header.addView(brandColumn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         header.addView(makePill("●  ANDROID", 0xFF86EFAC.toInt(), 0xFF102B28.toInt()))
         root.addView(header)
 
-        // Hero panel.
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = roundedBackground(intArrayOf(0xFF142C4A.toInt(), 0xFF17213B.toInt()), 24)
-        }
-        hero.addView(TextView(this).apply {
-            text = "LINUX, IN YOUR POCKET"
-            textSize = 10f
-            letterSpacing = 0.16f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF7DD3FC.toInt())
-        })
-        hero.addView(TextView(this).apply {
-            text = "Your own Ubuntu\nworkspace."
-            textSize = 26f
-            setLineSpacing(dp(1).toFloat(), 1f)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            setTextColor(0xFFF3F8FF.toInt())
-            setPadding(0, dp(7), 0, dp(5))
-        })
-        hero.addView(TextView(this).apply {
-            text = "A rootless Linux environment, powered by PRoot."
-            textSize = 12f
-            setTextColor(0xFFB6C8E2.toInt())
-        })
-        val heroActions = LinearLayout(this).apply {
+        // Prompt stays directly below the app bar for fast command entry.
+        val promptRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(16), 0, 0)
+            setPadding(dp(10), dp(2), dp(5), dp(2))
+            background = roundedBackground(intArrayOf(0xFF172A40.toInt(), 0xFF132238.toInt()), 14)
         }
-        val installButton = makeActionButton("↓  INSTALL UBUNTU", 0xFF38BDF8.toInt(), 0xFF08243A.toInt(), true) {
-            installUbuntuRuntime()
-        }
-        heroActions.addView(installButton, LinearLayout.LayoutParams(0, dp(46), 1f))
-        val statusButton = makeActionButton("CHECK STATUS", 0xFFD5E7FF.toInt(), 0x263B82B8, false) {
-            appendLine(if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04: installed and ready." else "Ubuntu 24.04: not installed.")
-            updateRuntimeStatus()
-        }
-        val statusParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(46))
-        statusParams.marginStart = dp(8)
-        heroActions.addView(statusButton, statusParams)
-        hero.addView(heroActions)
-        root.addView(hero)
-
-        // Runtime and storage cards.
-        val infoRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(12), 0, dp(12))
-        }
-        val runtimeCard = makeInfoCard("UBUNTU RUNTIME", "●  Checking…", 0xFF7DD3FC.toInt())
-        runtimeStatus = runtimeCard.second
-        infoRow.addView(runtimeCard.first, LinearLayout.LayoutParams(0, dp(78), 1f))
-        val storageCard = makeInfoCard("ANDROID STORAGE", "Not connected", 0xFFC4B5FD.toInt())
-        folderStatus = storageCard.second
-        val storageParams = LinearLayout.LayoutParams(0, dp(78), 1f)
-        storageParams.marginStart = dp(9)
-        infoRow.addView(storageCard.first, storageParams)
-        root.addView(infoRow)
-        updateRuntimeStatus()
-        updateFolderStatus()
-
-        // Quick tools.
-        val toolsTitle = TextView(this).apply {
-            text = "QUICK ACTIONS"
+        promptLabel = TextView(this).apply {
+            text = prompt
             textSize = 10f
-            letterSpacing = 0.15f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF7186A8.toInt())
-            setPadding(dp(2), dp(2), 0, dp(7))
+            typeface = Typeface.create("monospace", Typeface.BOLD)
+            setTextColor(0xFF86EFAC.toInt())
+            maxWidth = dp(105)
+            isSingleLine = true
         }
-        root.addView(toolsTitle)
-        val toolsScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-        }
-        val tools = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        val toolItems = listOf(
-            Triple("📁  Storage", 0xFFC4B5FD.toInt(), { openAndroidFolderPicker() }),
-            Triple("⌨  Help", 0xFF7DD3FC.toInt(), { appendLine("Commands: help, version, install-ubuntu, ubuntu-status, clear, exit") }),
-            Triple("✦  Clear", 0xFF86EFAC.toInt(), { output.text = "" })
-        )
-        toolItems.forEach { item ->
-            val button = makeActionButton(item.first, item.second, 0xFF172338.toInt(), false, item.third)
-            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40))
-            params.marginEnd = dp(8)
-            tools.addView(button, params)
-        }
-        toolsScroll.addView(tools)
-        root.addView(toolsScroll)
-
-        // Terminal panel.
-        val terminalPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = roundedBackground(intArrayOf(0xFF101A2A.toInt(), 0xFF0D1523.toInt()), 20)
-            setPadding(dp(10), dp(10), dp(10), dp(8))
-        }
-        val terminalHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(5), dp(2), dp(5), dp(8))
-        }
-        val terminalTitle = TextView(this).apply {
-            text = "TERMINAL"
-            textSize = 11f
-            letterSpacing = 0.13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFFE2EDFC.toInt())
-        }
-        terminalHeader.addView(terminalTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        terminalHeader.addView(makePill("●  LIVE CONSOLE", 0xFF86EFAC.toInt(), 0xFF142B2A.toInt()))
-        terminalPanel.addView(terminalHeader)
-
-        scroll = ScrollView(this).apply {
-            isFillViewport = true
-            setClipToPadding(false)
-            setPadding(0, dp(4), 0, dp(4))
-        }
-        output = TextView(this).apply {
-            textSize = 12.5f
+        promptRow.addView(promptLabel)
+        input = EditText(this).apply {
+            setSingleLine(true)
+            textSize = 13f
             typeface = Typeface.create("monospace", Typeface.NORMAL)
-            setTextColor(0xFFDCE7F5.toInt())
-            setTextIsSelectable(true)
-            setLineSpacing(dp(3).toFloat(), 1f)
-            setPadding(dp(8), dp(8), dp(8), dp(12))
+            setTextColor(0xFFFFFFFF.toInt())
+            setHintTextColor(0xFF71819D.toInt())
+            hint = "Command…"
+            imeOptions = EditorInfo.IME_ACTION_SEND
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setBackgroundColor(0x00000000)
+            setPadding(dp(6), 0, dp(3), 0)
+            setOnEditorActionListener { _, actionId, event ->
+                val enter = actionId == EditorInfo.IME_ACTION_SEND ||
+                    actionId == EditorInfo.IME_ACTION_DONE ||
+                    (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)
+                if (enter) { submitCommand(); true } else false
+            }
         }
-        scroll.addView(output)
-        terminalPanel.addView(scroll, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-        root.addView(terminalPanel, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
+        promptRow.addView(input, LinearLayout.LayoutParams(0, dp(46), 1f))
+        val runButton = TextView(this).apply {
+            text = "➤"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(0xFF071827.toInt())
+            background = roundedBackground(intArrayOf(0xFF7DD3FC.toInt(), 0xFF38BDF8.toInt()), 11)
+            setOnClickListener { submitCommand() }
+        }
+        promptRow.addView(runButton, LinearLayout.LayoutParams(dp(42), dp(40)))
+        root.addView(promptRow)
 
-        // Terminal shortcut rail.
-        val shortcutLabel = TextView(this).apply {
-            text = "KEYBOARD SHORTCUTS"
-            textSize = 9f
-            letterSpacing = 0.13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF7186A8.toInt())
-            setPadding(dp(2), dp(9), 0, dp(4))
-        }
-        root.addView(shortcutLabel)
+        // Keyboard rail is immediately accessible, above the terminal output.
         val shortcutsScroll = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
-            setPadding(0, dp(2), 0, dp(5))
+            setPadding(0, dp(5), 0, dp(7))
         }
         val shortcuts = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -312,66 +233,213 @@ class MainActivity : Activity() {
                 typeface = Typeface.create("monospace", Typeface.BOLD)
                 gravity = Gravity.CENTER
                 setTextColor(0xFFCBDAEF.toInt())
-                setPadding(dp(11), dp(8), dp(11), dp(8))
-                background = roundedBackground(intArrayOf(0xFF1B2940.toInt(), 0xFF152136.toInt()), 10)
+                setPadding(dp(10), dp(7), dp(10), dp(7))
+                background = roundedBackground(intArrayOf(0xFF1B2940.toInt(), 0xFF152136.toInt()), 9)
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { handleShortcut(key) }
             }
-            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(36))
+            val params = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(34))
             params.marginEnd = dp(5)
             shortcuts.addView(keyView, params)
         }
         shortcutsScroll.addView(shortcuts)
         root.addView(shortcutsScroll)
 
-        // Command composer.
-        val promptRow = LinearLayout(this).apply {
+        // The terminal receives all remaining height.
+        val terminalPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedBackground(intArrayOf(0xFF101A2A.toInt(), 0xFF0D1523.toInt()), 18)
+            setPadding(dp(8), dp(8), dp(8), dp(6))
+        }
+        val terminalHeader = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(4), dp(6), dp(4))
-            background = roundedBackground(intArrayOf(0xFF172A40.toInt(), 0xFF132238.toInt()), 16)
+            setPadding(dp(4), dp(1), dp(4), dp(5))
         }
-        promptLabel = TextView(this).apply {
-            text = prompt
+        terminalHeader.addView(TextView(this).apply {
+            text = "TERMINAL"
             textSize = 10f
-            typeface = Typeface.create("monospace", Typeface.BOLD)
-            setTextColor(0xFF86EFAC.toInt())
-            maxWidth = dp(110)
-        }
-        promptRow.addView(promptLabel)
-        input = EditText(this).apply {
-            setSingleLine(true)
-            textSize = 13f
-            typeface = Typeface.create("monospace", Typeface.NORMAL)
-            setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFF71819D.toInt())
-            hint = "Enter a command…"
-            imeOptions = EditorInfo.IME_ACTION_SEND
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            setBackgroundColor(0x00000000)
-            setPadding(dp(7), 0, dp(4), 0)
-            setOnEditorActionListener { _, actionId, event ->
-                val enter = actionId == EditorInfo.IME_ACTION_SEND ||
-                    actionId == EditorInfo.IME_ACTION_DONE ||
-                    (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)
-                if (enter) { submitCommand(); true } else false
-            }
-        }
-        promptRow.addView(input, LinearLayout.LayoutParams(0, dp(48), 1f))
-        val runButton = TextView(this).apply {
-            text = "➤"
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setTextColor(0xFF071827.toInt())
-            background = roundedBackground(intArrayOf(0xFF7DD3FC.toInt(), 0xFF38BDF8.toInt()), 12)
-            setPadding(dp(13), 0, dp(13), 0)
-            setOnClickListener { submitCommand() }
-        }
-        promptRow.addView(runButton, LinearLayout.LayoutParams(dp(44), dp(42)))
-        root.addView(promptRow)
+            letterSpacing = 0.13f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFE2EDFC.toInt())
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        terminalHeader.addView(makePill("●  LIVE", 0xFF86EFAC.toInt(), 0xFF142B2A.toInt()))
+        terminalPanel.addView(terminalHeader)
 
-        setContentView(root)
+        scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setClipToPadding(false)
+            setPadding(0, dp(2), 0, dp(3))
+        }
+        output = TextView(this).apply {
+            textSize = 12.5f
+            typeface = Typeface.create("monospace", Typeface.NORMAL)
+            setTextColor(0xFFDCE7F5.toInt())
+            setTextIsSelectable(true)
+            setLineSpacing(dp(3).toFloat(), 1f)
+            setPadding(dp(7), dp(6), dp(7), dp(10))
+        }
+        scroll.addView(output)
+        terminalPanel.addView(scroll, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        root.addView(terminalPanel, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+
+        frame.addView(root, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+        setContentView(frame)
+        updateRuntimeStatus()
+        updateFolderStatus()
+    }
+
+    /** Opens the secondary controls without shrinking the terminal workspace. */
+    private fun openSideMenu() {
+        val decor = window.decorView as? ViewGroup ?: return
+        val existing = decor.findViewWithTag<View>("nexora_side_menu")
+        if (existing != null) {
+            decor.removeView(existing)
+            return
+        }
+
+        val overlay = FrameLayout(this).apply { tag = "nexora_side_menu" }
+        val scrim = View(this).apply {
+            setBackgroundColor(0x99030A14.toInt())
+            isClickable = true
+            setOnClickListener { decor.removeView(overlay) }
+        }
+        overlay.addView(scrim, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ))
+
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(22), dp(18), dp(18))
+            background = roundedBackground(intArrayOf(0xFF142238.toInt(), 0xFF0B1422.toInt()), 0)
+            elevation = dp(16).toFloat()
+        }
+        val panelParams = FrameLayout.LayoutParams(
+            minOf(dp(310), (resources.displayMetrics.widthPixels * 0.84f).toInt()),
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            Gravity.START
+        )
+        overlay.addView(panel, panelParams)
+
+        panel.addView(TextView(this).apply {
+            text = "NEXORA"
+            textSize = 24f
+            letterSpacing = 0.08f
+            typeface = Typeface.create("sans-serif-black", Typeface.NORMAL)
+            setTextColor(0xFFEAF5FF.toInt())
+        })
+        panel.addView(TextView(this).apply {
+            text = "WORKSPACE & SETTINGS"
+            textSize = 9f
+            letterSpacing = 0.15f
+            setTextColor(0xFF7DD3FC.toInt())
+            setPadding(0, dp(3), 0, dp(18))
+        })
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(14), dp(14), dp(14))
+            background = roundedBackground(intArrayOf(0xFF193858.toInt(), 0xFF17243D.toInt()), 16)
+        }
+        hero.addView(TextView(this).apply {
+            text = "LINUX, IN YOUR POCKET"
+            textSize = 10f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF7DD3FC.toInt())
+        })
+        hero.addView(TextView(this).apply {
+            text = "Ubuntu 24.04 LTS"
+            textSize = 17f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFF3F8FF.toInt())
+            setPadding(0, dp(5), 0, dp(3))
+        })
+        hero.addView(TextView(this).apply {
+            text = "A rootless Linux workspace powered by PRoot."
+            textSize = 11f
+            setTextColor(0xFFB6C8E2.toInt())
+        })
+        panel.addView(hero)
+
+        val install = makeActionButton("↓  INSTALL / REPAIR UBUNTU", 0xFF06243A.toInt(), 0xFF38BDF8.toInt(), true) {
+            decor.removeView(overlay)
+            installUbuntuRuntime()
+        }
+        val installParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46))
+        installParams.topMargin = dp(14)
+        panel.addView(install, installParams)
+
+        val status = makeActionButton("◉  CHECK UBUNTU STATUS", 0xFFD5E7FF.toInt(), 0xFF263B5A.toInt(), false) {
+            appendLine(if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04: installed and ready." else "Ubuntu 24.04: not installed.")
+            updateRuntimeStatus()
+            decor.removeView(overlay)
+        }
+        val statusParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44))
+        statusParams.topMargin = dp(8)
+        panel.addView(status, statusParams)
+
+        val section = TextView(this).apply {
+            text = "CONNECTIONS"
+            textSize = 9f
+            letterSpacing = 0.14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF8295B3.toInt())
+            setPadding(dp(2), dp(22), 0, dp(8))
+        }
+        panel.addView(section)
+
+        val runtimeCard = makeInfoCard("UBUNTU RUNTIME", if (ubuntuRuntime.isInstalled()) "●  READY" else "○  NOT INSTALLED", 0xFF7DD3FC.toInt())
+        runtimeStatus = runtimeCard.second
+        panel.addView(runtimeCard.first, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70)))
+        val storageCard = makeInfoCard("ANDROID STORAGE", if (preferences.getString("android_tree_uri", null) != null) "●  Connected" else "○  Not connected", 0xFFC4B5FD.toInt())
+        folderStatus = storageCard.second
+        val storageParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70))
+        storageParams.topMargin = dp(8)
+        panel.addView(storageCard.first, storageParams)
+
+        val storage = makeActionButton("📁  CONNECT ANDROID FOLDER", 0xFFE0D7FF.toInt(), 0xFF28264A.toInt(), false) {
+            decor.removeView(overlay)
+            openAndroidFolderPicker()
+        }
+        val storageActionParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
+        storageActionParams.topMargin = dp(10)
+        panel.addView(storage, storageActionParams)
+
+        val help = makeActionButton("⌨  COMMAND HELP", 0xFFBDEBFF.toInt(), 0xFF18334A.toInt(), false) {
+            appendLine("Commands: help, version, install-ubuntu, ubuntu-status, clear, exit")
+            decor.removeView(overlay)
+        }
+        val helpParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
+        helpParams.topMargin = dp(8)
+        panel.addView(help, helpParams)
+
+        val clear = makeActionButton("✦  CLEAR TERMINAL", 0xFFB8F7D4.toInt(), 0xFF17352F.toInt(), false) {
+            output.text = ""
+            decor.removeView(overlay)
+        }
+        val clearParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
+        clearParams.topMargin = dp(8)
+        panel.addView(clear, clearParams)
+
+        panel.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
+        panel.addView(TextView(this).apply {
+            text = "NEXORA ANDROID  •  ROOTLESS UBUNTU"
+            textSize = 8f
+            letterSpacing = 0.08f
+            setTextColor(0xFF647A99.toInt())
+            gravity = Gravity.CENTER
+        })
+
+        decor.addView(overlay, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ))
     }
 
     private fun roundedBackground(colors: IntArray, radius: Int): GradientDrawable =
