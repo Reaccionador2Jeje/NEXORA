@@ -100,3 +100,9 @@ Unknown commands are launched as external programs using the operating system pr
 ## License
 
 NEXORA is distributed under the MIT License. See [LICENSE](LICENSE).
+
+## Walletie compatibility
+
+NEXORA's terminal and shell workflows remain independent of Walletie. Optional ecosystem features may integrate after AtDev identity compatibility is available.
+
+Walletie V1 currently accepts AtDev Cloud HS256 tokens only; other identity systems need the documented SSO bridge first. See the [Walletie integration matrix](https://github.com/Reaccionador2Jeje/Walletie/blob/main/docs/INTEGRATION_MATRIX.md).
