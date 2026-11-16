@@ -127,7 +127,7 @@ jobs:
           mkdir -p app/src/main/assets/qemu/arm64-v8a
           install -m 0755 /tmp/nexora-qemu-android-arm64/qemu-system-aarch64 app/src/main/assets/qemu/arm64-v8a/
           find /tmp/nexora-qemu-android-arm64 -maxdepth 1 -type f -name '*.so*' \
-            -exec install -m 0644 {} app/src/main/assets/qemu/arm64-v8a/ +
+            -exec install -m 0644 -t app/src/main/assets/qemu/arm64-v8a/ {} +
           install -m 0644 /tmp/nexora-qemu-android-arm64/SHA256SUMS app/src/main/assets/qemu/arm64-v8a/
           mkdir -p app/src/main/assets/qemu/arm64-v8a/firmware
           install -m 0644 /tmp/nexora-qemu-android-arm64/firmware/AAVMF_CODE.fd.gz app/src/main/assets/qemu/arm64-v8a/firmware/
