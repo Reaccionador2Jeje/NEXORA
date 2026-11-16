@@ -16,6 +16,8 @@ pub enum Command {
     Pwd,
     List(Option<PathBuf>),
     ChangeDirectory(Option<PathBuf>),
+    QemuCheck,
+    QemuVersion,
     External { program: String, args: Vec<String> },
 }
 
@@ -52,6 +54,8 @@ pub fn parse_command(input: &str) -> Result<Option<Command>, String> {
         }
         "echo" => Command::Echo(rest.to_vec()),
         "pwd" => Command::Pwd,
+        "qemu-check" => Command::QemuCheck,
+        "qemu-version" => Command::QemuVersion,
         "ls" | "dir" => {
             if rest.len() > 1 {
                 return Err("usage: ls [path]".to_string());
@@ -174,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_external_program_and_arguments() {
+    fn parses_qemu_host_commands() {\n        assert_eq!(parse_command("qemu-check").unwrap(), Some(Command::QemuCheck));\n        assert_eq!(parse_command("qemu-version").unwrap(), Some(Command::QemuVersion));\n    }\n\n    #[test]\n    fn parses_external_program_and_arguments() {
         assert_eq!(
             parse_command("git status").unwrap(),
             Some(Command::External {
