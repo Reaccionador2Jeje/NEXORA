@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_qemu_start_disk_path() {\n        assert_eq!(parse_command("qemu-start ubuntu.qcow2").unwrap(), Some(Command::QemuStart(PathBuf::from("ubuntu.qcow2"))));\n    }\n\n    #[test]\n    fn qemu_diagnostics_reject_unexpected_arguments() {\n        assert!(parse_command("qemu-check extra").is_err());\n        assert!(parse_command("qemu-version extra").is_err());\n    }\n\n    #[test]\n    fn parses_external_program_and_arguments() {
+    fn parses_qemu_start_disk_path() {\n        assert_eq!(parse_command("qemu-start ubuntu.qcow2").unwrap(), Some(Command::QemuStart(PathBuf::from("ubuntu.qcow2"))));\n    }\n\n    #[test]\n    fn qemu_start_requires_exactly_one_disk_argument() {\n        assert!(parse_command("qemu-start").is_err());\n        assert!(parse_command("qemu-start disk.qcow2 extra").is_err());\n    }\n\n    #[test]\n    fn qemu_diagnostics_reject_unexpected_arguments() {\n        assert!(parse_command("qemu-check extra").is_err());\n        assert!(parse_command("qemu-version extra").is_err());\n    }\n\n    #[test]\n    fn parses_external_program_and_arguments() {
         assert_eq!(
             parse_command("git status").unwrap(),
             Some(Command::External {
