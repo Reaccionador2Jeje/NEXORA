@@ -107,6 +107,21 @@ pub fn start(disk: &Path) -> Result<(), String> {
     }
 }
 
+/// Verify that both QEMU's system emulator and disk utility are usable.
+pub fn check() -> Result<String, String> {
+    let emulator = version()?;
+    let image_tool = locate_qemu_img()?;
+    let output = Command::new(&image_tool)
+        .arg("--version")
+        .output()
+        .map_err(|error| format!("qemu-img was found but could not start: {error}"))?;
+    if !output.status.success() {
+        return Err(format!("qemu-img version probe failed with status {}", output.status));
+    }
+    let image_version = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(format!("{emulator}\nDisk utility: {}\n{image_version}", image_tool.display()))
+}
+
 /// Run QEMU's version probe and return its output.
 pub fn version() -> Result<String, String> {
     let executable = locate()?;
