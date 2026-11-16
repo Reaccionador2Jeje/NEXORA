@@ -4,7 +4,7 @@
 //! Desktop hosts must provide a native x86_64 system emulator.
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 
 const OVERRIDE: &str = "NEXORA_QEMU_BIN";
@@ -79,12 +79,6 @@ pub fn version() -> Result<String, String> {
 
     Ok(format!("Executable: {}
 {text}", executable.display()))
-}
-
-/// Check whether a user-supplied path is a regular file.
-#[allow(dead_code)]
-fn is_file(path: &Path) -> bool {
-    path.is_file()
 }
 
 #[cfg(test)]
