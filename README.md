@@ -2,13 +2,17 @@
 
 **Your Terminal. Your Universe.**
 
-NEXORA is an independent, cross-platform terminal environment project targeting **Android and Windows**.
+NEXORA is an independent, cross-platform terminal environment project targeting **Android, Windows, and Linux desktop systems**.
 
 The project is developed as a modular terminal engine first, so its command system can be reused by platform-specific interfaces without tying the core to one UI framework.
 
 ## Android application\n\nA native Kotlin Android frontend prototype now lives in `android/`. It provides a terminal-style interface with built-in commands and an app-private filesystem workspace. Arbitrary shell execution is not enabled, and the Kotlin prototype is not yet connected to the shared Rust engine; JNI integration remains planned.\n\n## Continuous integration
 
 GitHub Actions validates every push and pull request targeting `main` on Ubuntu and Windows. The workflow checks Rust formatting, compiles the Rust workspace, runs its tests on Ubuntu and Windows, and builds the Android debug APK.
+
+## PC QEMU integration
+
+The desktop QEMU integration has started. A dedicated GitHub Actions workflow installs and validates native `qemu-system-x86_64` on Windows and Linux. This is the host-toolchain validation stage only: the Rust QEMU process adapter, Ubuntu guest provisioning, and terminal lifecycle commands are still pending. See [QEMU PC integration](docs/QEMU_PC_INTEGRATION.md).
 
 ## Android runtime migration
 
@@ -28,7 +32,7 @@ Current foundation:
 - External program launching through the operating system, without passing input through a shell.
 - Platform-neutral core with no third-party Rust dependencies.
 
-History and completion are currently command-based. Interactive Tab-key editing, arrow-key history navigation, and the Android/Windows graphical applications are not implemented yet.
+History and completion are currently command-based. Interactive Tab-key editing, arrow-key history navigation, and the full Windows desktop application are not implemented yet.
 
 ## Repository layout
 
@@ -53,7 +57,8 @@ NEXORA/
 
 - Rust stable toolchain (1.75 or newer recommended).
 - Windows, Linux, or macOS for developing the CLI.
-- Android support is planned through a dedicated application frontend and Android-targeted builds.
+- Android builds use a dedicated application frontend and Android-targeted builds.
+- Desktop QEMU currently requires a native host installation; automated validation is being added for Windows and Linux.
 
 ## Build and run
 
