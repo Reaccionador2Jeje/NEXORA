@@ -292,6 +292,30 @@ if "/* These Bionic aliases collide with the 9p protocol struct field names. */"
 source.write_text(text)
 PY
 
+# The iov marshaller also accesses V9fsStatDotl timestamp fields. Keep the
+# Bionic aliases undefined for this translation unit, not just the struct
+# declaration and hw/9pfs/9p.c.
+python3 - "$QEMU_SOURCE/fsdev/9p-iov-marshal.c" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+text = source.read_text()
+anchor = '#include "qemu/osdep.h"'
+guard = """#include "qemu/osdep.h"
+
+/* Preserve the 9p protocol field names instead of Bionic stat aliases. */
+#undef st_atime_nsec
+#undef st_mtime_nsec
+#undef st_ctime_nsec
+"""
+if text.count(anchor) != 1:
+    raise SystemExit("Could not locate the unique 9p-iov-marshal.c include anchor")
+if "/* Preserve the 9p protocol field names instead of Bionic stat aliases. */" not in text:
+    text = text.replace(anchor, guard, 1)
+source.write_text(text)
+PY
+
 QEMU_BUILD="$BUILD/qemu"
 # QEMU's Meson cross file expects a target-prefixed nm executable. The
 # Android NDK ships llvm-nm instead, so provide the conventional alias.
