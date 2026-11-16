@@ -47,3 +47,17 @@ jobs:
           set -euo pipefail
           command -v ${{ matrix.command }}
           ${{ matrix.command }} --version
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Validate NEXORA QEMU integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo test --workspace
+          cargo run -p nexora-cli -- qemu-check
+          cargo build --workspace --release
