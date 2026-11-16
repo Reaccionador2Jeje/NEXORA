@@ -14,6 +14,10 @@ GitHub Actions validates every push and pull request targeting `main` on Ubuntu 
 
 The desktop QEMU integration has started. A dedicated GitHub Actions workflow installs and validates native `qemu-system-x86_64` on Windows and Linux. This is the host-toolchain validation stage only: the Rust QEMU process adapter, Ubuntu guest provisioning, and terminal lifecycle commands are still pending. See [QEMU PC integration](docs/QEMU_PC_INTEGRATION.md).
 
+## PC QEMU integration
+
+The desktop CLI now includes `qemu-check` and `qemu-version` to discover and verify a native `qemu-system-x86_64` installation on Windows/Linux. Set `NEXORA_QEMU_BIN` to override executable discovery. Windows and Linux CI install QEMU and run these checks. VM creation, Ubuntu provisioning, start/stop lifecycle, and serial-console integration remain in progress; see [QEMU PC integration](docs/QEMU_PC_INTEGRATION.md).
+
 ## Android runtime migration
 
 The Android app now selects QEMU System Emulation as its Linux runtime. Android CI builds the standalone ARM64 QEMU executable, packages its shared libraries and AAVMF firmware into the APK, and then builds the APK from that verified artifact. Ubuntu 24.04 is provisioned as a persistent VM and exposed through the serial terminal. Physical-device boot, persistence, and recovery acceptance tests are still required; PRoot is no longer part of the Android installer or APK.
