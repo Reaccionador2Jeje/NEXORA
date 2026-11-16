@@ -139,7 +139,7 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
         }
         Command::Complete(prefix) => print_completions(&prefix),
         Command::Echo(parts) => println!("{}", parts.join(" ")),
-        Command::QemuCheck => match qemu::version() {
+        Command::QemuCheck => match qemu::check() {
             Ok(details) => println!("QEMU desktop runtime available\n{details}"),
             Err(error) => return Err(error),
         },
