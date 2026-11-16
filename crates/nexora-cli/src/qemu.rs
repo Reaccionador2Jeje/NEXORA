@@ -5,7 +5,7 @@
 
 use std::env;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 const OVERRIDE: &str = "NEXORA_QEMU_BIN";
 
@@ -46,6 +46,48 @@ fn executable_names() -> Vec<&'static str> {
         vec!["qemu-system-x86_64.exe", "qemu-system-x86_64"]
     } else {
         vec!["qemu-system-x86_64"]
+    }
+}
+
+/// Boot an existing QCOW2 disk with a serial-only foreground console.
+pub fn start(disk: &PathBuf) -> Result<(), String> {
+    if !disk.is_file() {
+        return Err(format!("VM disk does not exist: {}", disk.display()));
+    }
+    let disk_text = disk.to_string_lossy();
+    if disk_text.contains(',') {
+        return Err("VM disk paths containing commas are not supported by this QEMU drive configuration.".to_string());
+    }
+
+    let executable = locate()?;
+    println!("Starting desktop QEMU with disk: {}", disk.display());
+    println!("Serial console is attached to this terminal. Press Ctrl+C to stop QEMU.");
+
+    let status = Command::new(&executable)
+        .args([
+            "-machine", "q35",
+            "-accel", "tcg",
+            "-cpu", "max",
+            "-m", "2048",
+            "-smp", "2",
+            "-display", "none",
+            "-monitor", "none",
+            "-serial", "stdio",
+            "-nic", "none",
+            "-no-reboot",
+        ])
+        .arg("-drive")
+        .arg(format!("file={},format=qcow2,if=virtio", disk.display()))
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|error| format!("Could not start QEMU: {error}"))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("QEMU exited with status {status}"))
     }
 }
 
