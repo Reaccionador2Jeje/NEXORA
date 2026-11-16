@@ -8,6 +8,9 @@ on:
       - "docs/QEMU_PC_INTEGRATION.md"
       - "scripts/check-qemu-pc.sh"
       - "scripts/check-qemu-pc.ps1"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
   pull_request:
     branches: [main]
   workflow_dispatch:
