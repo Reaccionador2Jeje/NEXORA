@@ -268,6 +268,30 @@ if text.count('#undef st_atime_nsec') != 1 or text.count('#pragma pop_macro("st_
 source.write_text(text)
 PY
 
+# The timestamp aliases must also stay undefined in 9p.c while accessing
+# V9fsStatDotl fields. The header guard above protects the struct declaration;
+# this translation-unit guard prevents Bionic from rewriting member accesses.
+python3 - "$QEMU_SOURCE/hw/9pfs/9p.c" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+text = source.read_text()
+anchor = '#include <math.h>'
+guard = """#include <math.h>
+
+/* These Bionic aliases collide with the 9p protocol struct field names. */
+#undef st_atime_nsec
+#undef st_mtime_nsec
+#undef st_ctime_nsec
+"""
+if text.count(anchor) != 1:
+    raise SystemExit("Could not locate the unique 9p.c include anchor")
+if "/* These Bionic aliases collide with the 9p protocol struct field names. */" not in text:
+    text = text.replace(anchor, guard, 1)
+source.write_text(text)
+PY
+
 QEMU_BUILD="$BUILD/qemu"
 # QEMU's Meson cross file expects a target-prefixed nm executable. The
 # Android NDK ships llvm-nm instead, so provide the conventional alias.
