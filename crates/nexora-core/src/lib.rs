@@ -54,8 +54,14 @@ pub fn parse_command(input: &str) -> Result<Option<Command>, String> {
         }
         "echo" => Command::Echo(rest.to_vec()),
         "pwd" => Command::Pwd,
-        "qemu-check" => Command::QemuCheck,
-        "qemu-version" => Command::QemuVersion,
+        "qemu-check" => {
+            if !rest.is_empty() { return Err("usage: qemu-check".to_string()); }
+            Command::QemuCheck
+        }
+        "qemu-version" => {
+            if !rest.is_empty() { return Err("usage: qemu-version".to_string()); }
+            Command::QemuVersion
+        }
         "ls" | "dir" => {
             if rest.len() > 1 {
                 return Err("usage: ls [path]".to_string());
