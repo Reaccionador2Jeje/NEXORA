@@ -31,10 +31,13 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 - [ ] Add managed background lifecycle, QMP shutdown, and VM status reporting.
 - Do not execute shell commands or accept arbitrary shell fragments as QEMU arguments.
 
-### PC-3 — Ubuntu guest provisioning
-- Provision an x86_64 Ubuntu guest image with checksum verification.
-- Store the QCOW2 disk, UEFI variables, and cloud-init seed in a persistent per-user NEXORA data directory.
-- Make provisioning idempotent and refuse to replace an existing disk.
+### PC-3 — Ubuntu guest provisioning (initial disk stage implemented)
+- [x] Download the official Ubuntu 24.04 Noble x86_64 cloud image.
+- [x] Verify the downloaded image against Ubuntu's published SHA-256 manifest.
+- [x] Store the disk in a per-user NEXORA data directory and expand its sparse QCOW2 capacity to 20 GiB.
+- [x] Refuse to overwrite an existing Ubuntu disk.
+- [ ] Generate NoCloud cloud-init seed with a secure first-login credential.
+- [ ] Validate first boot and persistent writes on Windows and Linux.
 
 ### PC-4 — terminal and lifecycle integration (in progress)
 - [x] Add `qemu-check`, `qemu-version`, and `qemu-start <disk.qcow2>` to the PC CLI.
@@ -49,12 +52,13 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 
 ## Current CLI commands
 
-- `qemu-check` locates the native desktop QEMU executable and runs its version probe.
+- `qemu-check` locates the native desktop QEMU executable and `qemu-img`, then runs both version probes.
+- `qemu-install` downloads Ubuntu 24.04 x86_64, verifies SHA-256, and prepares a persistent 20 GiB QCOW2 disk under the user data directory.
 - `qemu-version` prints the executable path and QEMU version.
 - `qemu-start <disk.qcow2>` boots an existing QCOW2 disk using x86_64 TCG and attaches the serial console to the current terminal. Press Ctrl+C to stop the foreground QEMU process.
 - Set `NEXORA_QEMU_BIN` to an explicit executable path if QEMU is not on `PATH`.
 
-The diagnostic commands verify host QEMU availability. `qemu-start` can boot an existing QCOW2 disk, but NEXORA does not yet provision Ubuntu, create a disk, manage a background VM, or provide `qemu-stop`/`qemu-status`.
+`qemu-install` prepares the Ubuntu cloud disk, but first-boot cloud-init user setup is not ready yet. `qemu-start <disk.qcow2>` remains a foreground serial-console launcher. Managed background lifecycle and graceful stop/status commands are still pending.
 
 ## Initial limitation
 
