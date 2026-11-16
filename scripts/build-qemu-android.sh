@@ -262,7 +262,7 @@ restore = """#pragma pop_macro("st_ctime_nsec")
 
 """
 text = text.replace(start, guard + start, 1)
-text = text.replace(end, end + "\\n\\n" + restore.rstrip(), 1)
+text = text.replace(end, end + "\n\n" + restore.rstrip(), 1)
 if text.count('#undef st_atime_nsec') != 1 or text.count('#pragma pop_macro("st_atime_nsec")') != 1:
     raise SystemExit("Android 9p timestamp macro guard was not applied")
 source.write_text(text)
