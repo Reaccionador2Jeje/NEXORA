@@ -61,6 +61,10 @@ pub fn start(disk: &Path) -> Result<(), String> {
                 .to_string(),
         );
     }
+    #[cfg(windows)]
+    let disk_path = disk_text.replace('\\', "/");
+    #[cfg(not(windows))]
+    let disk_path = disk_text.into_owned();
 
     let executable = locate()?;
     println!("Starting desktop QEMU with disk: {}", disk.display());
@@ -89,7 +93,7 @@ pub fn start(disk: &Path) -> Result<(), String> {
             "-no-reboot",
         ])
         .arg("-drive")
-        .arg(format!("file={},format=qcow2,if=virtio", disk.display()))
+        .arg(format!("file={disk_path},format=qcow2,if=virtio"))
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
