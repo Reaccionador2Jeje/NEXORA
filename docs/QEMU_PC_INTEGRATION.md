@@ -27,7 +27,8 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 - [x] Support `NEXORA_QEMU_BIN` as an explicit executable override.
 - [x] Add `qemu-check` and `qemu-version` diagnostics to the NEXORA CLI.
 - [x] Add Windows/Linux CI validation that installs QEMU, runs the CLI diagnostics, and builds/tests the Rust workspace.
-- [ ] Expand the adapter with validated VM argument construction and process lifecycle management.
+- [x] Add a foreground VM launcher using a native QEMU process, TCG, and a serial terminal.
+- [ ] Add managed background lifecycle, QMP shutdown, and VM status reporting.
 - Do not execute shell commands or accept arbitrary shell fragments as QEMU arguments.
 
 ### PC-3 — Ubuntu guest provisioning
@@ -49,9 +50,10 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 
 - `qemu-check` locates the native desktop QEMU executable and runs its version probe.
 - `qemu-version` prints the executable path and QEMU version.
+- `qemu-start <disk.qcow2>` boots an existing QCOW2 disk using x86_64 TCG and attaches the serial console to the current terminal. Press Ctrl+C to stop the foreground QEMU process.
 - Set `NEXORA_QEMU_BIN` to an explicit executable path if QEMU is not on `PATH`.
 
-These commands verify host QEMU availability only. They do not create, start, or stop a guest VM.
+The diagnostic commands verify host QEMU availability. `qemu-start` can boot an existing QCOW2 disk, but NEXORA does not yet provision Ubuntu, create a disk, manage a background VM, or provide `qemu-stop`/`qemu-status`.
 
 ## Initial limitation
 
