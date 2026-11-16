@@ -139,7 +139,11 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
         }
         Command::Complete(prefix) => print_completions(&prefix),
         Command::Echo(parts) => println!("{}", parts.join(" ")),
-        Command::QemuCheck => match qemu::version() {\n            Ok(details) => println!("QEMU desktop runtime available\\n{details}"),\n            Err(error) => return Err(error),\n        },\n        Command::QemuVersion => println!("{}", qemu::version()?),
+        Command::QemuCheck => match qemu::version() {
+            Ok(details) => println!("QEMU desktop runtime available\n{details}"),
+            Err(error) => return Err(error),
+        },
+        Command::QemuVersion => println!("{}", qemu::version()?),
         Command::Pwd => {
             let path = env::current_dir().map_err(|error| error.to_string())?;
             println!("{}", path.display());
@@ -191,7 +195,8 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
 fn print_completions(prefix: &str) {
     let mut candidates = BTreeSet::new();
     let builtins = [
-        "help", "version", "clear", "exit", "history", "complete", "echo", "pwd", "ls", "cd",\n        "qemu-check", "qemu-version",
+        "help", "version", "clear", "exit", "history", "complete", "echo", "pwd", "ls", "cd",
+        "qemu-check", "qemu-version",
     ];
 
     for command in builtins {
@@ -291,7 +296,9 @@ fn print_help() {
     println!("  history              Show saved command history");
     println!("  !N                   Run history entry number N");
     println!("  complete [prefix]    Suggest built-in and PATH commands");
-    println!("  qemu-check           Detect and verify desktop QEMU");\n    println!("  qemu-version         Show desktop QEMU version");\n    println!("  exit                 Close NEXORA");
+    println!("  qemu-check           Detect and verify desktop QEMU");
+    println!("  qemu-version         Show desktop QEMU version");
+    println!("  exit                 Close NEXORA");
     println!();
     println!("Other commands are launched as external programs.");
     println!("Tip: quote arguments that contain spaces.");
