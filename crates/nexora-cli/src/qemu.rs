@@ -4,7 +4,7 @@
 //! Desktop hosts must provide a native x86_64 system emulator.
 
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 const OVERRIDE: &str = "NEXORA_QEMU_BIN";
@@ -50,7 +50,7 @@ fn executable_names() -> Vec<&'static str> {
 }
 
 /// Boot an existing QCOW2 disk with a serial-only foreground console.
-pub fn start(disk: &PathBuf) -> Result<(), String> {
+pub fn start(disk: &Path) -> Result<(), String> {
     if !disk.is_file() {
         return Err(format!("VM disk does not exist: {}", disk.display()));
     }
