@@ -178,7 +178,13 @@ mod tests {
     }
 
     #[test]
-    fn parses_qemu_host_commands() {\n        assert_eq!(parse_command("qemu-check").unwrap(), Some(Command::QemuCheck));\n        assert_eq!(parse_command("qemu-version").unwrap(), Some(Command::QemuVersion));\n    }\n\n    #[test]\n    fn parses_external_program_and_arguments() {
+    fn parses_qemu_host_commands() {
+        assert_eq!(parse_command("qemu-check").unwrap(), Some(Command::QemuCheck));
+        assert_eq!(parse_command("qemu-version").unwrap(), Some(Command::QemuVersion));
+    }
+
+    #[test]
+    fn parses_external_program_and_arguments() {
         assert_eq!(
             parse_command("git status").unwrap(),
             Some(Command::External {
