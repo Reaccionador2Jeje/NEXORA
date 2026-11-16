@@ -197,8 +197,14 @@ mod tests {
 
     #[test]
     fn parses_qemu_host_commands() {
-        assert_eq!(parse_command("qemu-check").unwrap(), Some(Command::QemuCheck));
-        assert_eq!(parse_command("qemu-version").unwrap(), Some(Command::QemuVersion));
+        assert_eq!(
+            parse_command("qemu-check").unwrap(),
+            Some(Command::QemuCheck)
+        );
+        assert_eq!(
+            parse_command("qemu-version").unwrap(),
+            Some(Command::QemuVersion)
+        );
     }
 
     #[test]
