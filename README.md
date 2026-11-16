@@ -16,7 +16,7 @@ The desktop QEMU integration has started. A dedicated GitHub Actions workflow in
 
 ## PC QEMU integration
 
-The desktop CLI now includes `qemu-check` and `qemu-version` to discover and verify a native `qemu-system-x86_64` installation on Windows/Linux. Set `NEXORA_QEMU_BIN` to override executable discovery. Windows and Linux CI install QEMU and run these checks. VM creation, Ubuntu provisioning, start/stop lifecycle, and serial-console integration remain in progress; see [QEMU PC integration](docs/QEMU_PC_INTEGRATION.md).
+The desktop CLI now includes `qemu-check` and `qemu-version` to discover and verify a native `qemu-system-x86_64` installation on Windows/Linux, plus `qemu-start <disk.qcow2>` to boot an existing QCOW2 disk with a serial console. Set `NEXORA_QEMU_BIN` to override executable discovery. Windows and Linux CI install QEMU and run these checks. Ubuntu provisioning and managed VM lifecycle remain in progress; see [QEMU PC integration](docs/QEMU_PC_INTEGRATION.md).
 
 ## Android runtime migration
 
