@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/qemu-pc.yml"
-      - "docs/QEMU_PC_INTEGRATION.md"
+      - "docs/**"
       - "scripts/check-qemu-pc.sh"
       - "scripts/check-qemu-pc.ps1"
       - "Cargo.toml"
