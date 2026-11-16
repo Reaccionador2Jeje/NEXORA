@@ -44,6 +44,15 @@ jobs:
         shell: bash
         run: ${{ matrix.install }}
 
+      - name: Add QEMU to PATH (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $qemuDir = Join-Path $env:ProgramFiles "qemu"
+          if (Test-Path (Join-Path $qemuDir "qemu-system-x86_64.exe")) {
+            Add-Content -Path $env:GITHUB_PATH -Value $qemuDir
+          }
+
       - name: Verify QEMU executable
         shell: bash
         run: |
