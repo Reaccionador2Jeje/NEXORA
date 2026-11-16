@@ -251,6 +251,9 @@ cd "$QEMU_BUILD"
   -Dcapstone=disabled -Dcurl=disabled -Dlibnfs=disabled \
   -Dspice=disabled -Dusb_redir=disabled -Dlibusb=disabled \
   -Dopengl=disabled -Dvirglrenderer=disabled -Dkvm=disabled \
+  -Dvhost_kernel=disabled -Dvhost_net=disabled -Dvhost_user=disabled \
+  -Dvhost_crypto=disabled -Dvhost_vdpa=disabled \
+  -Dvhost_user_blk_server=disabled -Dlibvduse=disabled -Dvduse_blk_export=disabled \
   -Dtcg=enabled -Dpixman=enabled -Dfdt=internal \
   -Daudio_drv_list=[] -Dpkgversion=NEXORA-Android-ARM64
 
