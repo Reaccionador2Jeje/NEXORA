@@ -165,6 +165,7 @@ pub fn ubuntu_directory() -> Result<PathBuf, String> {
 /// Download Ubuntu 24.04's official cloud image, verify its SHA-256, and
 /// expand its sparse QCOW2 virtual capacity to 20 GiB without overwriting data.
 pub fn install_ubuntu() -> Result<PathBuf, String> {
+    let qemu_img = locate_qemu_img()?;
     let directory = ubuntu_directory()?;
     fs::create_dir_all(&directory)
         .map_err(|error| format!("Cannot create VM directory '{}': {error}", directory.display()))?;
@@ -180,13 +181,18 @@ pub fn install_ubuntu() -> Result<PathBuf, String> {
         let _ = fs::remove_file(&download);
         return Err(error);
     }
-    let expected = expected_sha256(&checksums)?;
+    let expected = match expected_sha256(&checksums) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = fs::remove_file(&download);
+            return Err(error);
+        }
+    };
     if let Err(error) = verify_sha256(&download, &expected) {
         let _ = fs::remove_file(&download);
         return Err(error);
     }
 
-    let qemu_img = locate_qemu_img()?;
     fs::rename(&download, &disk)
         .map_err(|error| format!("Cannot move verified Ubuntu image into place: {error}"))?;
     let resize = Command::new(&qemu_img)
