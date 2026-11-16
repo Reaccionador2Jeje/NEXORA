@@ -56,7 +56,7 @@ pub fn start(disk: &PathBuf) -> Result<(), String> {
     }
     let disk_text = disk.to_string_lossy();
     if disk_text.contains(',') {
-        return Err("VM disk paths containing commas are not supported by this QEMU drive configuration.".to_string());
+        return Err(\n            "VM disk paths containing commas are not supported by this QEMU drive configuration."\n                .to_string(),\n        );
     }
 
     let executable = locate()?;
@@ -65,15 +65,24 @@ pub fn start(disk: &PathBuf) -> Result<(), String> {
 
     let status = Command::new(&executable)
         .args([
-            "-machine", "q35",
-            "-accel", "tcg",
-            "-cpu", "max",
-            "-m", "2048",
-            "-smp", "2",
-            "-display", "none",
-            "-monitor", "none",
-            "-serial", "stdio",
-            "-nic", "none",
+            "-machine",
+            "q35",
+            "-accel",
+            "tcg",
+            "-cpu",
+            "max",
+            "-m",
+            "2048",
+            "-smp",
+            "2",
+            "-display",
+            "none",
+            "-monitor",
+            "none",
+            "-serial",
+            "stdio",
+            "-nic",
+            "none",
             "-no-reboot",
         ])
         .arg("-drive")
