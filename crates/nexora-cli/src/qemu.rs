@@ -135,8 +135,11 @@ pub fn version() -> Result<String, String> {
         return Err("QEMU started but returned no version information".to_string());
     }
 
-    Ok(format!("Executable: {}
-{text}", executable.display()))
+    Ok(format!(
+        "Executable: {}
+{text}",
+        executable.display()
+    ))
 }
 
 #[cfg(test)]
@@ -146,6 +149,8 @@ mod tests {
     #[test]
     fn desktop_binary_name_is_qemu_system_x86_64() {
         let names = executable_names();
-        assert!(names.iter().any(|name| name.starts_with("qemu-system-x86_64")));
+        assert!(names
+            .iter()
+            .any(|name| name.starts_with("qemu-system-x86_64")));
     }
 }
