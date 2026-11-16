@@ -1,0 +1,49 @@
+name: Validate QEMU on PC
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/qemu-pc.yml"
+      - "docs/QEMU_PC_INTEGRATION.md"
+      - "scripts/check-qemu-pc.sh"
+      - "scripts/check-qemu-pc.ps1"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qemu-pc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Native QEMU on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            install: sudo apt-get update && sudo apt-get install -y qemu-system-x86
+            command: qemu-system-x86_64
+          - os: windows-latest
+            install: choco install qemu -y --no-progress
+            command: qemu-system-x86_64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out NEXORA
+        uses: actions/checkout@v4
+
+      - name: Install native QEMU
+        shell: bash
+        run: ${{ matrix.install }}
+
+      - name: Verify QEMU executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ${{ matrix.command }}
+          ${{ matrix.command }} --version
