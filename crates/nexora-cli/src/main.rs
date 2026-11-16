@@ -144,6 +144,7 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
             Err(error) => return Err(error),
         },
         Command::QemuVersion => println!("{}", qemu::version()?),
+        Command::QemuInstall => {\n            let disk = qemu::install_ubuntu()?;\n            println!("Start it with: qemu-start \\\"{}\\\"", disk.display());\n        }
         Command::QemuStart(disk) => qemu::start(&disk)?,
         Command::Pwd => {
             let path = env::current_dir().map_err(|error| error.to_string())?;
@@ -207,6 +208,7 @@ fn print_completions(prefix: &str) {
         "ls",
         "cd",
         "qemu-check",
+        "qemu-install",
         "qemu-version",
         "qemu-start",
     ];
@@ -309,6 +311,7 @@ fn print_help() {
     println!("  !N                   Run history entry number N");
     println!("  complete [prefix]    Suggest built-in and PATH commands");
     println!("  qemu-check           Detect and verify desktop QEMU");
+    println!("  qemu-install         Download and verify Ubuntu 24.04 VM disk");
     println!("  qemu-version         Show desktop QEMU version");
     println!("  qemu-start <disk>    Boot an existing QCOW2 disk in the terminal");
     println!("  exit                 Close NEXORA");
