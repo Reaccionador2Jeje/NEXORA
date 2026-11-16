@@ -57,11 +57,11 @@ pub fn parse_command(input: &str) -> Result<Option<Command>, String> {
         "qemu-check" => {
             if !rest.is_empty() { return Err("usage: qemu-check".to_string()); }
             Command::QemuCheck
-        }
+        },
         "qemu-version" => {
             if !rest.is_empty() { return Err("usage: qemu-version".to_string()); }
             Command::QemuVersion
-        }
+        },
         "ls" | "dir" => {
             if rest.len() > 1 {
                 return Err("usage: ls [path]".to_string());
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_external_program_and_arguments() {
+    fn qemu_diagnostics_reject_unexpected_arguments() {\n        assert!(parse_command("qemu-check extra").is_err());\n        assert!(parse_command("qemu-version extra").is_err());\n    }\n\n    #[test]\n    fn parses_external_program_and_arguments() {
         assert_eq!(
             parse_command("git status").unwrap(),
             Some(Command::External {
