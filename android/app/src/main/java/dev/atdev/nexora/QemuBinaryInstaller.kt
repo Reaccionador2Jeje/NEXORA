@@ -12,7 +12,8 @@ import java.security.MessageDigest
 class QemuBinaryInstaller(private val context: Context) {
     data class InstalledQemu(
         val executable: File,
-        val libraryDirectory: File
+        val libraryDirectory: File,
+        val temporaryDirectory: File
     )
 
     data class InstalledFirmware(
@@ -72,7 +73,7 @@ class QemuBinaryInstaller(private val context: Context) {
 
             val installedExecutable = File(destination, "qemu-system-aarch64")
             check(installedExecutable.canExecute()) { "QEMU is not executable after installation." }
-            return InstalledQemu(installedExecutable, destination)
+            return InstalledQemu(installedExecutable, destination, context.cacheDir)
         } catch (error: Exception) {
             staging.deleteRecursively()
             throw error
@@ -152,6 +153,7 @@ class QemuBinaryInstaller(private val context: Context) {
             .redirectErrorStream(true)
             .apply {
                 environment()["LD_LIBRARY_PATH"] = installed.libraryDirectory.absolutePath
+                environment()["TMPDIR"] = installed.temporaryDirectory.absolutePath
             }
             .start()
         val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
