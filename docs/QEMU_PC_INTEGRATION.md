@@ -16,10 +16,11 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 
 ## Stages
 
-### PC-1 — host toolchain validation
-- Add Windows and Linux CI jobs that install native QEMU and verify `qemu-system-x86_64 --version`.
-- Verify NEXORA can locate a configured executable or one on `PATH`.
-- Keep the existing Android ARM64 QEMU workflow independent.
+### PC-1 — host toolchain validation (implemented; CI confirmation pending)
+- [x] Add Windows and Linux CI jobs that install native QEMU and verify `qemu-system-x86_64 --version`.
+- [x] Verify NEXORA can locate a configured executable or one on `PATH`.
+- [x] Keep the existing Android ARM64 QEMU workflow independent.
+- [ ] Confirm both hosted runners pass the end-to-end `qemu-check` validation.
 
 ### PC-2 — shared Rust QEMU host adapter (in progress)
 - [x] Add a platform-neutral Rust module for native executable discovery.
