@@ -219,11 +219,9 @@ text, count = re.subn(pattern, lambda _: replacement, text, count=1, flags=re.S)
 if count != 1:
     raise SystemExit("Could not locate exactly one qemu_shm_alloc() in QEMU 10.1.2")
 
-# Fail before compiling if the Android implementation or the upstream fallback
-# was not preserved exactly where expected.
-patched = source.read_text()
-function_start = patched.index("int qemu_shm_alloc(size_t size, Error **errp)")
-function_text = patched[function_start:]
+# Validate the transformed in-memory source before writing it to disk.
+function_start = text.index("int qemu_shm_alloc(size_t size, Error **errp)")
+function_text = text[function_start:]
 android_branch = re.search(r"#ifdef __ANDROID__(.*?)#else", function_text, re.S)
 posix_branch = re.search(r"#else(.*?)#endif", function_text, re.S)
 if not android_branch or "mkstemp(" not in android_branch.group(1):
@@ -232,7 +230,7 @@ if not posix_branch or "shm_open(" not in posix_branch.group(1):
     raise SystemExit("Non-Android POSIX shared-memory fallback was not preserved")
 if "shm_open(" in android_branch.group(1) or "shm_unlink(" in android_branch.group(1):
     raise SystemExit("Android branch still references unavailable POSIX shm APIs")
-source.write_text(patched)
+source.write_text(text)
 PY
 QEMU_BUILD="$BUILD/qemu"
 # QEMU's Meson cross file expects a target-prefixed nm executable. The
