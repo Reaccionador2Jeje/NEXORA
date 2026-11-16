@@ -36,10 +36,11 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 - Store the QCOW2 disk, UEFI variables, and cloud-init seed in a persistent per-user NEXORA data directory.
 - Make provisioning idempotent and refuse to replace an existing disk.
 
-### PC-4 — terminal and lifecycle integration
-- Add `qemu-check`, `qemu-install`, `qemu-start`, `qemu-stop`, and `qemu-status` to the PC CLI.
-- Bridge the VM serial console to the interactive terminal.
-- Support graceful shutdown and report abnormal exits clearly.
+### PC-4 — terminal and lifecycle integration (in progress)
+- [x] Add `qemu-check`, `qemu-version`, and `qemu-start <disk.qcow2>` to the PC CLI.
+- [x] Attach the guest serial console to the active NEXORA terminal session.
+- [ ] Add `qemu-install`, `qemu-stop`, and `qemu-status`.
+- [ ] Add managed VM process tracking and graceful QMP shutdown.
 
 ### PC-5 — acceptance
 - Verify first boot, login, persistent files across restarts, graceful stop, and recovery on Windows and Linux.
