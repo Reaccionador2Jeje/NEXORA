@@ -162,7 +162,7 @@ import sys
 
 source = Path(sys.argv[1])
 text = source.read_text()
-pattern = r"int qemu_shm_alloc\\(size_t size, Error \\*\\*errp\\)\\n\\{.*?\\n\\}"
+pattern = r"int qemu_shm_alloc\(size_t size, Error \*\*errp\)\n\{.*?\n\}"
 replacement = r"""int qemu_shm_alloc(size_t size, Error **errp)
 {
     int fd;
