@@ -144,6 +144,7 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
             Err(error) => return Err(error),
         },
         Command::QemuVersion => println!("{}", qemu::version()?),
+        Command::QemuStart(disk) => qemu::start(&disk)?,
         Command::Pwd => {
             let path = env::current_dir().map_err(|error| error.to_string())?;
             println!("{}", path.display());
@@ -196,7 +197,7 @@ fn print_completions(prefix: &str) {
     let mut candidates = BTreeSet::new();
     let builtins = [
         "help", "version", "clear", "exit", "history", "complete", "echo", "pwd", "ls", "cd",
-        "qemu-check", "qemu-version",
+        "qemu-check", "qemu-version", "qemu-start",
     ];
 
     for command in builtins {
@@ -298,6 +299,7 @@ fn print_help() {
     println!("  complete [prefix]    Suggest built-in and PATH commands");
     println!("  qemu-check           Detect and verify desktop QEMU");
     println!("  qemu-version         Show desktop QEMU version");
+    println!("  qemu-start <disk>    Boot an existing QCOW2 disk in the terminal");
     println!("  exit                 Close NEXORA");
     println!();
     println!("Other commands are launched as external programs.");
