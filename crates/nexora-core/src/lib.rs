@@ -145,6 +145,7 @@ fn tokenize(input: &str) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::{parse_command, Command};
+    use std::path::PathBuf;
 
     #[test]
     fn parses_builtin_command() {
