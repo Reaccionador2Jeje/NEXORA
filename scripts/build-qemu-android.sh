@@ -152,6 +152,74 @@ PKG_CONFIG_PATH="$PKG_CONFIG_PATH" pkg-config --modversion libpcre2-8
 
 echo "==> Configuring upstream QEMU for Android"
 QEMU_SOURCE="$WORK/src/qemu"
+# Bionic has no shm_open()/shm_unlink() declarations. Keep QEMU's fd-backed
+# shared-memory behavior on Android by creating a private temporary file and
+# unlinking it immediately after opening it. TMPDIR is set to app cache at runtime.
+python3 - "$QEMU_SOURCE/util/oslib-posix.c" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+source = Path(sys.argv[1])
+text = source.read_text()
+pattern = r"int qemu_shm_alloc\\(size_t size, Error \\*\\*errp\\)\\n\\{.*?\\n\\}"
+replacement = r"""int qemu_shm_alloc(size_t size, Error **errp)
+{
+    int fd;
+
+#ifdef __ANDROID__
+    g_autofree char *shm_path = g_strdup_printf("%s/qemu-" FMT_pid
+                                                 "-shm-XXXXXX",
+                                                 g_get_tmp_dir(), getpid());
+    fd = mkstemp(shm_path);
+    if (fd < 0) {
+        error_setg_errno(errp, errno,
+                         "failed to create Android temporary shared memory");
+        return -1;
+    }
+    if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1 || unlink(shm_path) == -1) {
+        int saved_errno = errno;
+        close(fd);
+        unlink(shm_path);
+        error_setg_errno(errp, saved_errno,
+                         "failed to detach Android temporary shared memory");
+        return -1;
+    }
+#else
+    g_autoptr(GString) shm_name = g_string_new(NULL);
+    int oflag, cur_sequence;
+    static int sequence;
+    mode_t mode;
+
+    cur_sequence = qatomic_fetch_inc(&sequence);
+    mode = 0;
+    oflag = O_RDWR | O_CREAT | O_EXCL;
+    g_string_printf(shm_name, "/qemu-" FMT_pid "-shm-%d", getpid(),
+                    cur_sequence);
+
+    fd = shm_open(shm_name->str, oflag, mode);
+    if (fd < 0) {
+        error_setg_errno(errp, errno,
+                         "failed to create POSIX shared memory");
+        return -1;
+    }
+    shm_unlink(shm_name->str);
+#endif
+
+    if (ftruncate(fd, size) == -1) {
+        error_setg_errno(errp, errno,
+                         "failed to resize POSIX shared memory to %zu", size);
+        close(fd);
+        return -1;
+    }
+
+    return fd;
+}"""
+text, count = re.subn(pattern, lambda _: replacement, text, count=1, flags=re.S)
+if count != 1:
+    raise SystemExit("Could not locate exactly one qemu_shm_alloc() in QEMU 10.1.2")
+source.write_text(text)
+PY
 QEMU_BUILD="$BUILD/qemu"
 # QEMU's Meson cross file expects a target-prefixed nm executable. The
 # Android NDK ships llvm-nm instead, so provide the conventional alias.
