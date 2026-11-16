@@ -30,7 +30,11 @@ History is stored under the user's application data directory:
 - Windows: `%APPDATA%/nexora/history.txt`.
 - Unix-like systems: `$XDG_DATA_HOME/nexora/history.txt`, falling back to `~/.local/share/nexora/history.txt`.
 
-## Android frontend (prototype)\n\nThe `android/` directory contains a native Kotlin application with a terminal-style UI. The first preview implements basic commands and confines filesystem navigation to the app-private files directory. It deliberately does not execute arbitrary shell commands. It currently runs independently of `nexora-core`; JNI integration and shared command execution are the next step.\n\n## Planned platform frontends
+## Android frontend (prototype)\n\nThe `android/` directory contains a native Kotlin application with a terminal-style UI. The first preview implements basic commands and confines filesystem navigation to the app-private files directory. It deliberately does not execute arbitrary shell commands. It currently runs independently of `nexora-core`; JNI integration and shared command execution are the next step.\n\n## Desktop QEMU adapter
+
+The Rust CLI has a native desktop QEMU adapter in `crates/nexora-cli/src/qemu.rs`. It discovers `qemu-system-x86_64` through `PATH` or `NEXORA_QEMU_BIN`, probes the executable version, and can boot an existing QCOW2 disk with TCG and a serial console attached to the current terminal. The Android ARM64 QEMU binary is not reused on desktop. Ubuntu provisioning, managed background lifecycle, and QMP-based shutdown are not implemented yet.
+
+## Planned platform frontends
 
 ### Android
 
