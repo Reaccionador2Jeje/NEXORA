@@ -30,7 +30,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            install: sudo apt-get update && sudo apt-get install -y qemu-system-x86
+            install: sudo apt-get update && sudo apt-get install -y qemu-system-x86 qemu-utils
             command: qemu-system-x86_64
           - os: windows-latest
             install: choco install qemu -y --no-progress
