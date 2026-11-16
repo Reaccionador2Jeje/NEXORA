@@ -56,17 +56,23 @@ pub fn parse_command(input: &str) -> Result<Option<Command>, String> {
         "echo" => Command::Echo(rest.to_vec()),
         "pwd" => Command::Pwd,
         "qemu-check" => {
-            if !rest.is_empty() { return Err("usage: qemu-check".to_string()); }
+            if !rest.is_empty() {
+                return Err("usage: qemu-check".to_string());
+            }
             Command::QemuCheck
-        },
+        }
         "qemu-version" => {
-            if !rest.is_empty() { return Err("usage: qemu-version".to_string()); }
+            if !rest.is_empty() {
+                return Err("usage: qemu-version".to_string());
+            }
             Command::QemuVersion
-        },
+        }
         "qemu-start" => {
-            if rest.len() != 1 { return Err("usage: qemu-start <disk.qcow2>".to_string()); }
+            if rest.len() != 1 {
+                return Err("usage: qemu-start <disk.qcow2>".to_string());
+            }
             Command::QemuStart(PathBuf::from(&rest[0]))
-        },
+        }
         "ls" | "dir" => {
             if rest.len() > 1 {
                 return Err("usage: ls [path]".to_string());
@@ -197,7 +203,10 @@ mod tests {
 
     #[test]
     fn parses_qemu_start_disk_path() {
-        assert_eq!(parse_command("qemu-start ubuntu.qcow2").unwrap(), Some(Command::QemuStart(PathBuf::from("ubuntu.qcow2"))));
+        assert_eq!(
+            parse_command("qemu-start ubuntu.qcow2").unwrap(),
+            Some(Command::QemuStart(PathBuf::from("ubuntu.qcow2")))
+        );
     }
 
     #[test]
