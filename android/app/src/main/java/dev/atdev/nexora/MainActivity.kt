@@ -770,25 +770,9 @@ class MainActivity : Activity() {
                 if (qemuVmActive) {
                     sendQemuInput(line)
                 } else if (!ubuntuRuntime.isInstalled()) {
-                    appendLine("QEMU Ubuntu VM is not prepared. Run install-ubuntu, then qemu-start.")
+                    appendLine("Ubuntu ARM64 is not installed. Run install-ubuntu, then qemu-start.")
                 } else {
-                    input.isEnabled = false
-                    val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
-                        putExtra(TerminalExecutionService.EXTRA_COMMAND, line)
-                        putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
-                        putExtra(TerminalExecutionService.EXTRA_UID, ubuntuUid)
-                        putExtra(
-                            TerminalExecutionService.EXTRA_TREE_URI,
-                            preferences.getString("android_tree_uri", null)
-                        )
-                    }
-                    try {
-                        if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
-                        else startService(serviceIntent)
-                    } catch (error: Exception) {
-                        input.isEnabled = true
-                        appendLine("Could not start background command: ${error.message}")
-                    }
+                    appendLine("Ubuntu is installed, but its QEMU virtual machine is stopped. Run qemu-start before entering Linux commands.")
                 }
             }
         }
