@@ -144,7 +144,10 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
             Err(error) => return Err(error),
         },
         Command::QemuVersion => println!("{}", qemu::version()?),
-        Command::QemuInstall => {\n            let disk = qemu::install_ubuntu()?;\n            println!("Start it with: qemu-start \\\"{}\\\"", disk.display());\n        }
+        Command::QemuInstall => {
+            let disk = qemu::install_ubuntu()?;
+            println!("Start it with: qemu-start \"{}\"", disk.display());
+        },
         Command::QemuStart(disk) => qemu::start(&disk)?,
         Command::Pwd => {
             let path = env::current_dir().map_err(|error| error.to_string())?;
