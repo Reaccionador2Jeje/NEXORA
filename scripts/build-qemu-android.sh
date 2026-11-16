@@ -232,6 +232,42 @@ if "shm_open(" in android_branch.group(1) or "shm_unlink(" in android_branch.gro
     raise SystemExit("Android branch still references unavailable POSIX shm APIs")
 source.write_text(text)
 PY
+
+# Android Bionic exposes these stat timestamp aliases as macros. QEMU's
+# 9p wire-format structs use the same identifiers as plain field names.
+# Temporarily hide the aliases only while declaring V9fsStatDotl, then
+# restore them for the rest of each translation unit.
+python3 - "$QEMU_SOURCE/fsdev/9p-marshal.h" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+text = source.read_text()
+start = "typedef struct V9fsStatDotl {"
+end = "} V9fsStatDotl;"
+if text.count(start) != 1 or text.count(end) != 1:
+    raise SystemExit("Could not locate exactly one V9fsStatDotl declaration")
+
+guard = """#pragma push_macro("st_atime_nsec")
+#pragma push_macro("st_mtime_nsec")
+#pragma push_macro("st_ctime_nsec")
+#undef st_atime_nsec
+#undef st_mtime_nsec
+#undef st_ctime_nsec
+
+"""
+restore = """#pragma pop_macro("st_ctime_nsec")
+#pragma pop_macro("st_mtime_nsec")
+#pragma pop_macro("st_atime_nsec")
+
+"""
+text = text.replace(start, guard + start, 1)
+text = text.replace(end, end + "\\n\\n" + restore.rstrip(), 1)
+if text.count('#undef st_atime_nsec') != 1 or text.count('#pragma pop_macro("st_atime_nsec")') != 1:
+    raise SystemExit("Android 9p timestamp macro guard was not applied")
+source.write_text(text)
+PY
+
 QEMU_BUILD="$BUILD/qemu"
 # QEMU's Meson cross file expects a target-prefixed nm executable. The
 # Android NDK ships llvm-nm instead, so provide the conventional alias.
