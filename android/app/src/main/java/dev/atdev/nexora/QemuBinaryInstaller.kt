@@ -73,7 +73,11 @@ class QemuBinaryInstaller(private val context: Context) {
 
             val installedExecutable = File(destination, "qemu-system-aarch64")
             check(installedExecutable.canExecute()) { "QEMU is not executable after installation." }
-            return InstalledQemu(installedExecutable, destination, context.cacheDir)
+            val temporaryDirectory = context.cacheDir
+            check(temporaryDirectory.isDirectory && temporaryDirectory.canWrite()) {
+                "The app-private temporary directory is not writable for QEMU shared memory."
+            }
+            return InstalledQemu(installedExecutable, destination, temporaryDirectory)
         } catch (error: Exception) {
             staging.deleteRecursively()
             throw error
