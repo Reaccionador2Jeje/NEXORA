@@ -67,6 +67,7 @@ class QemuVmController(
                 .redirectErrorStream(true)
                 .apply {
                     environment()["LD_LIBRARY_PATH"] = qemu.libraryDirectory.absolutePath
+                    environment()["TMPDIR"] = qemu.temporaryDirectory.absolutePath
                 }
                 .start()
             process = child
