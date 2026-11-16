@@ -21,9 +21,12 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 - Verify NEXORA can locate a configured executable or one on `PATH`.
 - Keep the existing Android ARM64 QEMU workflow independent.
 
-### PC-2 — shared Rust QEMU host adapter
-- Add a platform-neutral Rust module for executable discovery, capability checks, argument construction, and child-process lifecycle.
-- Add Windows/Linux tests for discovery and argument construction.
+### PC-2 — shared Rust QEMU host adapter (in progress)
+- [x] Add a platform-neutral Rust module for native executable discovery.
+- [x] Support `NEXORA_QEMU_BIN` as an explicit executable override.
+- [x] Add `qemu-check` and `qemu-version` diagnostics to the NEXORA CLI.
+- [x] Add Windows/Linux CI validation that installs QEMU, runs the CLI diagnostics, and builds/tests the Rust workspace.
+- [ ] Expand the adapter with validated VM argument construction and process lifecycle management.
 - Do not execute shell commands or accept arbitrary shell fragments as QEMU arguments.
 
 ### PC-3 — Ubuntu guest provisioning
@@ -40,6 +43,14 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 - Verify first boot, login, persistent files across restarts, graceful stop, and recovery on Windows and Linux.
 - Measure resource use and document host requirements.
 - Do not describe PC guest boot as supported until these tests pass.
+
+## Current CLI commands
+
+- `qemu-check` locates the native desktop QEMU executable and runs its version probe.
+- `qemu-version` prints the executable path and QEMU version.
+- Set `NEXORA_QEMU_BIN` to an explicit executable path if QEMU is not on `PATH`.
+
+These commands verify host QEMU availability only. They do not create, start, or stop a guest VM.
 
 ## Initial limitation
 
