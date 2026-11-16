@@ -222,8 +222,10 @@ if count != 1:
 # Fail before compiling if the Android implementation or the upstream fallback
 # was not preserved exactly where expected.
 patched = source.read_text()
-android_branch = re.search(r"#ifdef __ANDROID__(.*?)#else", patched, re.S)
-posix_branch = re.search(r"#else(.*?)#endif", patched, re.S)
+function_start = patched.index("int qemu_shm_alloc(size_t size, Error **errp)")
+function_text = patched[function_start:]
+android_branch = re.search(r"#ifdef __ANDROID__(.*?)#else", function_text, re.S)
+posix_branch = re.search(r"#else(.*?)#endif", function_text, re.S)
 if not android_branch or "mkstemp(" not in android_branch.group(1):
     raise SystemExit("Android shared-memory implementation was not applied")
 if not posix_branch or "shm_open(" not in posix_branch.group(1):
