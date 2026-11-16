@@ -18,6 +18,7 @@ pub enum Command {
     ChangeDirectory(Option<PathBuf>),
     QemuCheck,
     QemuVersion,
+    QemuInstall,
     QemuStart(PathBuf),
     External { program: String, args: Vec<String> },
 }
@@ -60,6 +61,12 @@ pub fn parse_command(input: &str) -> Result<Option<Command>, String> {
                 return Err("usage: qemu-check".to_string());
             }
             Command::QemuCheck
+        }
+        "qemu-install" => {
+            if !rest.is_empty() {
+                return Err("usage: qemu-install".to_string());
+            }
+            Command::QemuInstall
         }
         "qemu-version" => {
             if !rest.is_empty() {
@@ -196,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_qemu_host_commands() {
+    fn parses_qemu_install_command() {\n        assert_eq!(parse_command("qemu-install").unwrap(), Some(Command::QemuInstall));\n        assert!(parse_command("qemu-install extra").is_err());\n    }\n\n    #[test]\n    fn parses_qemu_host_commands() {
         assert_eq!(
             parse_command("qemu-check").unwrap(),
             Some(Command::QemuCheck)
