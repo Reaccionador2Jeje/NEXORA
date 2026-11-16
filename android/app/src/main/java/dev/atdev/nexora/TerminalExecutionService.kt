@@ -21,8 +21,15 @@ class TerminalExecutionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        qemuController?.stop()
+        // Never wait for QEMU on Android's main thread: process shutdown can take several seconds.
+        val controller = qemuController
         qemuController = null
+        if (controller != null) {
+            Thread({ runCatching { controller.stop() } }, "nexora-qemu-destroy").apply {
+                isDaemon = true
+                start()
+            }
+        }
         super.onDestroy()
     }
 
@@ -51,7 +58,16 @@ class TerminalExecutionService : Service() {
                 sendBroadcast(Intent(ACTION_QEMU_VM_STOPPED).setPackage(packageName)
                     .putExtra(EXTRA_QEMU_VM_EXIT, 0))
             } else {
-                controller.stop()
+                updateNotification("Stopping Ubuntu virtual machine…")
+                // QEMU shutdown waits for the child process. Keep that wait off the main thread.
+                Thread({
+                    runCatching { controller.stop() }.onFailure { error ->
+                        sendOutput("QEMU shutdown warning: ${error.message ?: "unknown error"}")
+                    }
+                }, "nexora-qemu-stop").apply {
+                    isDaemon = true
+                    start()
+                }
             }
             return START_NOT_STICKY
         }
