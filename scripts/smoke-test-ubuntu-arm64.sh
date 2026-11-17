@@ -21,16 +21,6 @@ echo "$EXPECTED  $IMAGE_NAME" | sha256sum --check -
 echo "==> Creating FAT12 NoCloud seed disk"
 cat > user-data <<'USERDATA'
 #cloud-config
-hostname: nexora
-network: {config: disabled}
-users:
-  - default
-  - name: nexora
-    gecos: NEXORA Boot Test
-    groups: [adm, sudo]
-    shell: /bin/bash
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: true
 runcmd:
   - [sh, -c, "echo NEXORA_VM_READY > /dev/ttyAMA0"]
 USERDATA
@@ -60,7 +50,8 @@ qemu-system-aarch64 \
   -device virtio-blk-device,drive=system \
   -drive if=none,id=seed,format=raw,file="$WORK/seed.img" \
   -device virtio-blk-device,drive=seed \
-  -nic none \
+  -netdev user,id=net0 \
+  -device virtio-net-device,netdev=net0 \
   -display none \
   -serial "file:$SERIAL_LOG" \
   -monitor none \
