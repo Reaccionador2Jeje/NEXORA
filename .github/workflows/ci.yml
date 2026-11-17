@@ -121,8 +121,11 @@ jobs:
           cd /tmp/nexora-qemu-android-arm64
           test -s qemu-system-aarch64
           cd "$GITHUB_WORKSPACE/android"
-          mkdir -p app/src/main/assets/qemu/arm64-v8a
-          install -m 0755 /tmp/nexora-qemu-android-arm64/qemu-system-aarch64 app/src/main/assets/qemu/arm64-v8a/
+          mkdir -p app/src/main/assets/qemu/arm64-v8a app/src/main/jniLibs/arm64-v8a
+          # Executables must come from the signed APK native-library directory.
+          # Android 10+ denies execve() from writable app filesDir, even after chmod.
+          install -m 0755 /tmp/nexora-qemu-android-arm64/qemu-system-aarch64 \
+            app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
           find /tmp/nexora-qemu-android-arm64 -maxdepth 1 -type f -name '*.so*' \
             -exec install -m 0644 -t app/src/main/assets/qemu/arm64-v8a/ {} +
           install -m 0644 /tmp/nexora-qemu-android-arm64/SHA256SUMS app/src/main/assets/qemu/arm64-v8a/
