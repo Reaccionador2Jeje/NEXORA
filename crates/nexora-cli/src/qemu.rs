@@ -281,10 +281,14 @@ fn expected_sha256(checksums: &Path) -> Result<String, String> {
 
 fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
     #[cfg(windows)]
-    let output = Command::new("certutil")
-        .arg("-hashfile")
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "(Get-FileHash -Algorithm SHA256 -LiteralPath $args[0]).Hash",
+        ])
         .arg(file)
-        .arg("SHA256")
         .output();
     #[cfg(not(windows))]
     let output = Command::new("sha256sum").arg(file).output();
