@@ -108,7 +108,6 @@ pub fn start(disk: &Path) -> Result<(), String> {
     }
 }
 
-
 const UBUNTU_IMAGE_URL: &str =
     "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img";
 const UBUNTU_SUMS_URL: &str = "https://cloud-images.ubuntu.com/noble/current/SHA256SUMS";
@@ -120,7 +119,10 @@ fn locate_qemu_img() -> Result<PathBuf, String> {
         if path.is_file() {
             return Ok(path);
         }
-        return Err(format!("NEXORA_QEMU_IMG_BIN points to a missing file: {}", path.display()));
+        return Err(format!(
+            "NEXORA_QEMU_IMG_BIN points to a missing file: {}",
+            path.display()
+        ));
     }
 
     let qemu = locate()?;
@@ -175,7 +177,10 @@ pub fn install_ubuntu() -> Result<PathBuf, String> {
     })?;
     let disk = directory.join("ubuntu-noble-amd64.qcow2");
     if disk.exists() {
-        return Err(format!("Ubuntu VM disk already exists at '{}'. Refusing to overwrite it.", disk.display()));
+        return Err(format!(
+            "Ubuntu VM disk already exists at '{}'. Refusing to overwrite it.",
+            disk.display()
+        ));
     }
 
     let download = directory.join(UBUNTU_IMAGE_NAME);
@@ -226,7 +231,9 @@ pub fn install_ubuntu() -> Result<PathBuf, String> {
 
     println!("Ubuntu 24.04 cloud disk prepared: {}", disk.display());
     println!("Virtual capacity: 20 GiB (sparse QCOW2).");
-    println!("Cloud-init user setup is not configured yet; guest login provisioning is the next step.");
+    println!(
+        "Cloud-init user setup is not configured yet; guest login provisioning is the next step."
+    );
     Ok(disk)
 }
 
@@ -260,17 +267,25 @@ fn expected_sha256(checksums: &Path) -> Result<String, String> {
         let mut fields = line.split_whitespace();
         let hash = fields.next().unwrap_or_default();
         let filename = fields.next().unwrap_or_default().trim_start_matches('*');
-        if filename == UBUNTU_IMAGE_NAME && hash.len() == 64
-            && hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        if filename == UBUNTU_IMAGE_NAME
+            && hash.len() == 64
+            && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
             return Ok(hash.to_ascii_lowercase());
         }
     }
-    Err(format!("Ubuntu SHA256SUMS has no valid checksum for {UBUNTU_IMAGE_NAME}"))
+    Err(format!(
+        "Ubuntu SHA256SUMS has no valid checksum for {UBUNTU_IMAGE_NAME}"
+    ))
 }
 
 fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
     #[cfg(windows)]
-    let output = Command::new("certutil").arg("-hashfile").arg(file).arg("SHA256").output();
+    let output = Command::new("certutil")
+        .arg("-hashfile")
+        .arg(file)
+        .arg("SHA256")
+        .output();
     #[cfg(not(windows))]
     let output = Command::new("sha256sum").arg(file).output();
 
@@ -287,7 +302,9 @@ fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
         .map(str::to_ascii_lowercase)
         .ok_or_else(|| "Could not parse SHA-256 utility output".to_string())?;
     if actual != expected {
-        return Err(format!("Ubuntu image checksum mismatch (expected {expected}, received {actual})."));
+        return Err(format!(
+            "Ubuntu image checksum mismatch (expected {expected}, received {actual})."
+        ));
     }
     Ok(())
 }
@@ -301,7 +318,10 @@ pub fn check() -> Result<String, String> {
         .output()
         .map_err(|error| format!("qemu-img was found but could not start: {error}"))?;
     if !output.status.success() {
-        return Err(format!("qemu-img version probe failed with status {}", output.status));
+        return Err(format!(
+            "qemu-img version probe failed with status {}",
+            output.status
+        ));
     }
     let image_version = String::from_utf8_lossy(&output.stdout).trim().to_string();
     Ok(format!(
