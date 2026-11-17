@@ -203,7 +203,16 @@ mod tests {
     }
 
     #[test]
-    fn parses_qemu_install_command() {\n        assert_eq!(parse_command("qemu-install").unwrap(), Some(Command::QemuInstall));\n        assert!(parse_command("qemu-install extra").is_err());\n    }\n\n    #[test]\n    fn parses_qemu_host_commands() {
+    fn parses_qemu_install_command() {
+        assert_eq!(
+            parse_command("qemu-install").unwrap(),
+            Some(Command::QemuInstall)
+        );
+        assert!(parse_command("qemu-install extra").is_err());
+    }
+
+    #[test]
+    fn parses_qemu_host_commands() {
         assert_eq!(
             parse_command("qemu-check").unwrap(),
             Some(Command::QemuCheck)
