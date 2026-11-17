@@ -19,9 +19,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: qemu-android-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
   prepare:
