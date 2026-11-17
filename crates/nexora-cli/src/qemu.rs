@@ -167,8 +167,12 @@ pub fn ubuntu_directory() -> Result<PathBuf, String> {
 pub fn install_ubuntu() -> Result<PathBuf, String> {
     let qemu_img = locate_qemu_img()?;
     let directory = ubuntu_directory()?;
-    fs::create_dir_all(&directory)
-        .map_err(|error| format!("Cannot create VM directory '{}': {error}", directory.display()))?;
+    fs::create_dir_all(&directory).map_err(|error| {
+        format!(
+            "Cannot create VM directory '{}': {error}",
+            directory.display()
+        )
+    })?;
     let disk = directory.join("ubuntu-noble-amd64.qcow2");
     if disk.exists() {
         return Err(format!("Ubuntu VM disk already exists at '{}'. Refusing to overwrite it.", disk.display()));
@@ -203,7 +207,10 @@ pub fn install_ubuntu() -> Result<PathBuf, String> {
         .map_err(|error| format!("Could not run qemu-img resize: {error}"))?;
     if !resize.status.success() {
         let _ = fs::remove_file(&disk);
-        return Err(format!("qemu-img resize failed: {}", String::from_utf8_lossy(&resize.stderr).trim()));
+        return Err(format!(
+            "qemu-img resize failed: {}",
+            String::from_utf8_lossy(&resize.stderr).trim()
+        ));
     }
     let info = Command::new(&qemu_img)
         .args(["info", "--output=json"])
@@ -211,7 +218,10 @@ pub fn install_ubuntu() -> Result<PathBuf, String> {
         .output()
         .map_err(|error| format!("Could not inspect Ubuntu disk: {error}"))?;
     if !info.status.success() {
-        return Err(format!("qemu-img could not validate the prepared disk: {}", String::from_utf8_lossy(&info.stderr).trim()));
+        return Err(format!(
+            "qemu-img could not validate the prepared disk: {}",
+            String::from_utf8_lossy(&info.stderr).trim()
+        ));
     }
 
     println!("Ubuntu 24.04 cloud disk prepared: {}", disk.display());
@@ -222,14 +232,23 @@ pub fn install_ubuntu() -> Result<PathBuf, String> {
 
 fn download_file(url: &str, destination: &Path) -> Result<(), String> {
     let output = Command::new("curl")
-        .args(["--fail", "--location", "--silent", "--show-error", "--output"])
+        .args([
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--output",
+        ])
         .arg(destination)
         .arg(url)
         .output()
         .map_err(|error| format!("Could not start curl for '{url}': {error}"))?;
     if !output.status.success() {
         let _ = fs::remove_file(destination);
-        return Err(format!("Download failed for '{url}': {}", String::from_utf8_lossy(&output.stderr).trim()));
+        return Err(format!(
+            "Download failed for '{url}': {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
     Ok(())
 }
@@ -257,7 +276,10 @@ fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
 
     let output = output.map_err(|error| format!("Could not calculate SHA-256: {error}"))?;
     if !output.status.success() {
-        return Err(format!("SHA-256 utility failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
+        return Err(format!(
+            "SHA-256 utility failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
     let actual = String::from_utf8_lossy(&output.stdout)
         .split_whitespace()
@@ -282,7 +304,10 @@ pub fn check() -> Result<String, String> {
         return Err(format!("qemu-img version probe failed with status {}", output.status));
     }
     let image_version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok(format!("{emulator}\nDisk utility: {}\n{image_version}", image_tool.display()))
+    Ok(format!(
+        "{emulator}\nDisk utility: {}\n{image_version}",
+        image_tool.display()
+    ))
 }
 
 /// Run QEMU's version probe and return its output.
