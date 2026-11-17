@@ -371,7 +371,8 @@ pub fn version() -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::executable_names;
+    use super::{executable_names, expected_sha256, UBUNTU_IMAGE_NAME};
+    use std::fs;
 
     #[test]
     fn desktop_binary_name_is_qemu_system_x86_64() {
@@ -379,5 +380,34 @@ mod tests {
         assert!(names
             .iter()
             .any(|name| name.starts_with("qemu-system-x86_64")));
+    }
+
+    #[test]
+    fn extracts_ubuntu_image_checksum_from_manifest() {
+        let path = std::env::temp_dir().join(format!(
+            "nexora-sha256-manifest-{}.txt",
+            std::process::id()
+        ));
+        let expected = "a".repeat(64);
+        fs::write(
+            &path,
+            format!("{expected}  {UBUNTU_IMAGE_NAME}\n{expected}  another.img\n"),
+        )
+        .unwrap();
+
+        assert_eq!(expected_sha256(&path).unwrap(), expected);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn rejects_manifest_without_ubuntu_image_checksum() {
+        let path = std::env::temp_dir().join(format!(
+            "nexora-sha256-invalid-{}.txt",
+            std::process::id()
+        ));
+        fs::write(&path, format!("{}  another.img\n", "b".repeat(64))).unwrap();
+
+        assert!(expected_sha256(&path).is_err());
+        fs::remove_file(path).unwrap();
     }
 }
