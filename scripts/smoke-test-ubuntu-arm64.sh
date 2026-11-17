@@ -28,10 +28,19 @@ cat > meta-data <<'METADATA'
 instance-id: iid-nexora-arm64-smoke
 local-hostname: nexora
 METADATA
+cat > network-config <<'NETWORK'
+version: 2
+ethernets:
+  dhcp-eth:
+    match:
+      name: "en*"
+    dhcp4: true
+NETWORK
 truncate -s 1440K seed.img
 mkfs.vfat -F 12 -n CIDATA seed.img
 mcopy -i seed.img user-data ::/user-data
 mcopy -i seed.img meta-data ::/meta-data
+mcopy -i seed.img network-config ::/network-config
 
 echo "==> Preparing matching AAVMF variable store"
 cp /usr/share/AAVMF/AAVMF_VARS.fd vars.fd
