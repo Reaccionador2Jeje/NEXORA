@@ -406,4 +406,15 @@ mod tests {
         assert!(expected_sha256(&path).is_err());
         fs::remove_file(path).unwrap();
     }
+
+    #[test]
+    fn verifies_sha256_on_the_current_host() {
+        let path =
+            std::env::temp_dir().join(format!("nexora-sha256-content-{}.txt", std::process::id()));
+        fs::write(&path, b"abc").unwrap();
+
+        let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert!(super::verify_sha256(&path, expected).is_ok());
+        fs::remove_file(path).unwrap();
+    }
 }
