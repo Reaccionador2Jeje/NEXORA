@@ -133,7 +133,7 @@ jobs:
           install -m 0644 /tmp/nexora-qemu-android-arm64/firmware/AAVMF_CODE.fd.gz app/src/main/assets/qemu/arm64-v8a/firmware/
           install -m 0644 /tmp/nexora-qemu-android-arm64/firmware/AAVMF_VARS.fd.gz app/src/main/assets/qemu/arm64-v8a/firmware/
           install -m 0644 /tmp/nexora-qemu-android-arm64/firmware/SHA256SUMS app/src/main/assets/qemu/arm64-v8a/firmware/
-          test -s app/src/main/assets/qemu/arm64-v8a/qemu-system-aarch64
+          test -s app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
           test -s app/src/main/assets/qemu/arm64-v8a/SHA256SUMS
 
       - name: Verify Android VM provisioning unit tests
