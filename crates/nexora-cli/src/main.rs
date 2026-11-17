@@ -147,7 +147,7 @@ fn execute(command: Command, history: &[String]) -> Result<(), String> {
         Command::QemuInstall => {
             let disk = qemu::install_ubuntu()?;
             println!("Start it with: qemu-start \"{}\"", disk.display());
-        },
+        }
         Command::QemuStart(disk) => qemu::start(&disk)?,
         Command::Pwd => {
             let path = env::current_dir().map_err(|error| error.to_string())?;
