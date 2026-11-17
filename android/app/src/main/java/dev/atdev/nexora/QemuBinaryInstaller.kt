@@ -29,7 +29,7 @@ class QemuBinaryInstaller(private val context: Context) {
 
         val assetPath = "qemu/arm64-v8a"
         val names = context.assets.list(assetPath)?.toSet().orEmpty()
-        check("qemu-system-aarch64" in names && "SHA256SUMS" in names) {
+        check("SHA256SUMS" in names) {
             "The QEMU runtime is not included in this APK. Install the build produced by the QEMU workflow."
         }
 
@@ -37,12 +37,18 @@ class QemuBinaryInstaller(private val context: Context) {
         check(parent.exists() || parent.mkdirs()) { "Cannot create the private QEMU directory." }
         val staging = File(parent, "arm64-v8a.installing")
         val destination = File(parent, "arm64-v8a")
+        // Android 10+ blocks execve() for binaries written into app-writable filesDir.
+        // Package QEMU in jniLibs so PackageManager extracts it into nativeLibraryDir.
+        val executable = File(context.applicationInfo.nativeLibraryDir, "libqemu-system-aarch64.so")
+        check(executable.isFile && executable.canRead() && executable.canExecute()) {
+            "QEMU executable is missing from the APK native library directory. Rebuild the APK with the QEMU jniLibs payload."
+        }
         staging.deleteRecursively()
         check(staging.mkdirs()) { "Cannot prepare the QEMU installation directory." }
 
         try {
             val installNames = names.filter {
-                it == "qemu-system-aarch64" || it == "SHA256SUMS" || it.endsWith(".so") || it.contains(".so.")
+                it == "SHA256SUMS" || it.endsWith(".so") || it.contains(".so.")
             }
             for (name in installNames) {
                 require(name.matches(Regex("[A-Za-z0-9_.+-]+"))) { "Invalid QEMU asset name." }
@@ -52,13 +58,7 @@ class QemuBinaryInstaller(private val context: Context) {
             }
 
             verifyChecksums(staging)
-            val executable = File(staging, "qemu-system-aarch64")
-            check(executable.setReadable(true, true) || executable.canRead()) {
-                "Cannot set QEMU executable read permission."
-            }
-            check(executable.setExecutable(true, true) || executable.canExecute()) {
-                "Android refused permission to execute QEMU from app-private storage."
-            }
+            verifyChecksums(staging, externalFiles = mapOf("qemu-system-aarch64" to executable))
 
             val previous = File(parent, "arm64-v8a.previous")
             previous.deleteRecursively()
@@ -171,7 +171,11 @@ class QemuBinaryInstaller(private val context: Context) {
         return output.lineSequence().firstOrNull().orEmpty()
     }
 
-    private fun verifyChecksums(directory: File, requiredFile: String = "qemu-system-aarch64") {
+    private fun verifyChecksums(
+        directory: File,
+        requiredFile: String = "qemu-system-aarch64",
+        externalFiles: Map<String, File> = emptyMap()
+    ) {
         val manifest = File(directory, "SHA256SUMS")
         check(manifest.isFile) { "QEMU checksum manifest is missing." }
         val entries = manifest.readLines().filter { it.isNotBlank() }
@@ -183,7 +187,7 @@ class QemuBinaryInstaller(private val context: Context) {
             val expected = match.groupValues[1].lowercase()
             val name = match.groupValues[2].removePrefix("./").trim()
             require(name.matches(Regex("[A-Za-z0-9_.+-]+"))) { "Invalid file name in QEMU checksum manifest." }
-            val file = File(directory, name)
+            val file = externalFiles[name] ?: File(directory, name)
             check(file.isFile) { "QEMU runtime file is missing: $name" }
             val digest = MessageDigest.getInstance("SHA-256")
             FileInputStream(file).use { input ->
