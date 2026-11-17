@@ -42,7 +42,8 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 ### PC-4 — terminal and lifecycle integration (in progress)
 - [x] Add `qemu-check`, `qemu-version`, and `qemu-start <disk.qcow2>` to the PC CLI.
 - [x] Attach the guest serial console to the active NEXORA terminal session.
-- [ ] Add `qemu-install`, `qemu-stop`, and `qemu-status`.
+- [x] Add `qemu-install` to prepare the verified Ubuntu cloud disk.
+- [ ] Add `qemu-stop` and `qemu-status`.
 - [ ] Add managed VM process tracking and graceful QMP shutdown.
 
 ### PC-5 — acceptance
@@ -60,6 +61,6 @@ Bring the QEMU Linux-VM capability to NEXORA desktop hosts without reusing the A
 
 `qemu-install` prepares the Ubuntu cloud disk, but first-boot cloud-init user setup is not ready yet. `qemu-start <disk.qcow2>` remains a foreground serial-console launcher. Managed background lifecycle and graceful stop/status commands are still pending.
 
-## Initial limitation
+## Current limitations
 
-The PC workflow in PC-1 validates that native QEMU is available on CI hosts. It does not yet provision or boot Ubuntu. Android's ARM64 guest pipeline remains separate.
+The desktop installer currently prepares only the Ubuntu QCOW2 disk. It does not yet create a NoCloud seed, provision a login, or attach a configured network device. Therefore a successful `qemu-install` does not yet mean the guest is ready for interactive login. `qemu-start` remains a foreground serial-console launcher. Android's ARM64 guest pipeline remains separate.
