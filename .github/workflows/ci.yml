@@ -15,9 +15,6 @@ permissions:
   actions: read
   contents: read
 
-concurrency:
-  group: nexora-ci-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
   validate:
