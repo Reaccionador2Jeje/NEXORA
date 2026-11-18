@@ -237,7 +237,7 @@ internal class TerminalView @JvmOverloads constructor(
             else -> desiredHeight
         }
         setMeasuredDimension(width, height)
-        val available = max(1f, width - paddingLeft - paddingRight)
+        val available = (width - paddingLeft - paddingRight).toFloat().coerceAtLeast(1f)
         val nextCols = (available / cellWidth).toInt().coerceAtLeast(20)
         if (nextCols != cols) resize(nextCols, rows)
     }
