@@ -69,7 +69,7 @@ class UbuntuRootfsInstaller(context: Context) {
                 "Ubuntu Base download returned HTTP ${connection.responseCode}."
             }
             val total = connection.contentLengthLong
-            val required = if (total > 0) total * 5 else 600L * 1024L * 1024L
+            val required = if (total > 0) maxOf(total * 20, 700L * 1024L * 1024L) else 700L * 1024L * 1024L
             check((installDir.usableSpace) >= required) {
                 "Not enough free storage. NEXORA needs about ${required / (1024 * 1024)} MB free."
             }
@@ -129,9 +129,25 @@ class UbuntuRootfsInstaller(context: Context) {
                                 java.nio.file.Paths.get(entry.linkName)
                             )
                         }
+                        entry.isLink -> {
+                            val target = File(root, entry.linkName).canonicalFile
+                            check(target.toPath().startsWith(root.toPath())) {
+                                "Ubuntu archive contains an unsafe hard link."
+                            }
+                            output.parentFile?.mkdirs()
+                            check(target.exists()) { "Ubuntu archive hard link target is missing." }
+                            java.nio.file.Files.createLink(output.toPath(), target.toPath())
+                        }
                         entry.isFile -> {
                             output.parentFile?.mkdirs()
-                            FileOutputStream(output).use { stream -> tar.copyTo(stream) }
+                            FileOutputStream(output).use { stream ->
+                                val buffer = ByteArray(64 * 1024)
+                                while (true) {
+                                    val count = tar.read(buffer)
+                                    if (count < 0) break
+                                    stream.write(buffer, 0, count)
+                                }
+                            }
                             output.setReadable(entry.mode and 0b100100100 != 0, false)
                             output.setWritable(entry.mode and 0b010010010 != 0, false)
                             output.setExecutable(entry.mode and 0b001001001 != 0, false)
