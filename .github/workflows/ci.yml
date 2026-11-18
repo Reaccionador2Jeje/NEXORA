@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Build QEMU for Android ARM64"]
-    types: [completed]
-    branches: [main]
 
 permissions:
   actions: read
@@ -73,14 +69,12 @@ jobs:
           retention-days: 14
 
   android-build:
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     name: Build Android app
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -91,50 +85,34 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools
+          packages: platform-tools, ndk;23.2.8568313
+
+      - name: Build standalone PRoot for Android ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/23.2.8568313"
+          test -x "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+          git clone https://github.com/green-green-avk/build-proot-android.git "$RUNNER_TEMP/build-proot-android"
+          git -C "$RUNNER_TEMP/build-proot-android" checkout --detach 01f83b8841358450c78333d1b33ab30d4943bec4
+          cd "$RUNNER_TEMP/build-proot-android"
+          sed -i "s|^ARCHS=.*|ARCHS='aarch64'|" config
+          sed -i "s|^NDK=.*|NDK=\"$ANDROID_NDK_HOME\"|" config
+          ./build.sh
+          ./make-proot-for-apk.sh
+          output="$RUNNER_TEMP/build-proot-android/build/root-aarch64/root-apk/bin"
+          destination="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$destination"
+          install -m 0755 "$output/libproot.so" "$destination/libproot.so"
+          install -m 0644 "$output/libproot-loader.so" "$destination/libproot-loader.so"
+          test -s "$destination/libproot.so"
+          test -s "$destination/libproot-loader.so"
+          file "$destination/libproot.so" "$destination/libproot-loader.so"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
-      - name: Download verified standalone QEMU artifact
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: nexora-qemu-android-arm64-candidate
-          path: /tmp/nexora-qemu-android-arm64
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Package QEMU runtime into Android assets
-        if: github.event_name == 'workflow_run'
-        working-directory: android
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd /tmp/nexora-qemu-android-arm64
-          sha256sum --check SHA256SUMS
-          cd firmware
-          sha256sum --check SHA256SUMS
-          cd /tmp/nexora-qemu-android-arm64
-          test -s qemu-system-aarch64
-          cd "$GITHUB_WORKSPACE/android"
-          mkdir -p app/src/main/assets/qemu/arm64-v8a app/src/main/jniLibs/arm64-v8a
-          # Executables must come from the signed APK native-library directory.
-          # Android 10+ denies execve() from writable app filesDir, even after chmod.
-          install -m 0755 /tmp/nexora-qemu-android-arm64/qemu-system-aarch64 \
-            app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
-          find /tmp/nexora-qemu-android-arm64 -maxdepth 1 -type f -name '*.so*' \
-            -exec install -m 0644 -t app/src/main/assets/qemu/arm64-v8a/ {} +
-          install -m 0644 /tmp/nexora-qemu-android-arm64/SHA256SUMS app/src/main/assets/qemu/arm64-v8a/
-          mkdir -p app/src/main/assets/qemu/arm64-v8a/firmware
-          install -m 0644 /tmp/nexora-qemu-android-arm64/firmware/AAVMF_CODE.fd.gz app/src/main/assets/qemu/arm64-v8a/firmware/
-          install -m 0644 /tmp/nexora-qemu-android-arm64/firmware/AAVMF_VARS.fd.gz app/src/main/assets/qemu/arm64-v8a/firmware/
-          install -m 0644 /tmp/nexora-qemu-android-arm64/firmware/SHA256SUMS app/src/main/assets/qemu/arm64-v8a/firmware/
-          test -s app/src/main/jniLibs/arm64-v8a/libqemu-system-aarch64.so
-          test -s app/src/main/assets/qemu/arm64-v8a/SHA256SUMS
 
       - name: Verify Android VM provisioning unit tests
         working-directory: android
