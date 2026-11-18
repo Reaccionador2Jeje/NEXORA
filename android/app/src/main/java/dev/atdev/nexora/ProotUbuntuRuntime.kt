@@ -65,6 +65,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
         uid: Int,
         androidShared: File?,
         line: (String) -> Unit,
+        onInputReady: (((String) -> Unit) -> Unit),
         done: (Int) -> Unit
     ) {
         if (!isInstalled()) {
@@ -113,6 +114,14 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                         environment()["TMPDIR"] = prootTempDir.absolutePath
                     }
                     .start()
+                onInputReady { value ->
+                    try {
+                        process.outputStream.write(value.toByteArray(Charsets.UTF_8))
+                        process.outputStream.flush()
+                    } catch (_: Exception) {
+                        // The process may have exited while the user was typing.
+                    }
+                }
                 BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
                     while (true) {
                         val output = reader.readLine() ?: break
