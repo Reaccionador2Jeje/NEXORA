@@ -72,21 +72,21 @@ class TerminalExecutionService : Service() {
             return START_NOT_STICKY
         }
 
-        val prepareQemuUbuntu = action == ACTION_PREPARE_QEMU_UBUNTU
+        val prepareProotUbuntu = action == ACTION_PREPARE_PROOT_UBUNTU
         val startQemuVm = action == ACTION_START_QEMU_VM
         val command = intent?.getStringExtra(EXTRA_COMMAND)
         val username = intent?.getStringExtra(EXTRA_USERNAME) ?: "user"
         val hostname = intent?.getStringExtra(EXTRA_HOSTNAME) ?: "nexora"
         val uid = intent?.getIntExtra(EXTRA_UID, 10000) ?: 10000
         val treeUri = intent?.getStringExtra(EXTRA_TREE_URI)?.let(Uri::parse)
-        if (!prepareQemuUbuntu && !startQemuVm && command.isNullOrBlank()) {
+        if (!prepareProotUbuntu && !startQemuVm && command.isNullOrBlank()) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
         createNotificationChannel()
         val taskLabel = when {
-            prepareQemuUbuntu -> "Installing QEMU and preparing Ubuntu 24.04 ARM64 VM…"
+            prepareProotUbuntu -> "Installing PRoot and preparing Ubuntu 24.04 ARM64…"
             startQemuVm -> "Starting Ubuntu virtual machine…"
             else -> "Running: $command"
         }
@@ -97,13 +97,13 @@ class TerminalExecutionService : Service() {
             startForeground(notificationId, notification)
         }
 
-        if (prepareQemuUbuntu) {
-            sendOutput("Installing QEMU and preparing the independent Ubuntu ARM64 VM.")
+        if (prepareProotUbuntu) {
+            sendOutput("Installing PRoot and preparing the Ubuntu ARM64 root filesystem.")
             LinuxRuntimeFactory.create(this).install(username, hostname, { message ->
                 sendOutput(message)
                 updateNotification(message)
             }) { success, message, _ ->
-                finishQemuInstall(startId, success, message)
+                finishProotInstall(startId, success, message)
             }
             return START_NOT_STICKY
         }
@@ -199,13 +199,13 @@ class TerminalExecutionService : Service() {
         }.start()
     }
 
-    private fun finishQemuInstall(startId: Int, success: Boolean, message: String) {
-        sendBroadcast(Intent(ACTION_QEMU_INSTALL_FINISHED).setPackage(packageName)
+    private fun finishProotInstall(startId: Int, success: Boolean, message: String) {
+        sendBroadcast(Intent(ACTION_PROOT_INSTALL_FINISHED).setPackage(packageName)
             .putExtra(EXTRA_QEMU_INSTALL_SUCCESS, success)
             .putExtra(EXTRA_QEMU_INSTALL_MESSAGE, message))
         getSystemService(NotificationManager::class.java).notify(
             notificationId + 1,
-            buildNotification(if (success) "Ubuntu VM prepared" else "Ubuntu VM preparation failed", false)
+            buildNotification(if (success) "Ubuntu PRoot environment ready" else "Ubuntu PRoot preparation failed", false)
         )
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf(startId)
@@ -281,7 +281,8 @@ class TerminalExecutionService : Service() {
     }
 
     companion object {
-        const val ACTION_PREPARE_QEMU_UBUNTU = "dev.atdev.nexora.PREPARE_QEMU_UBUNTU"
+        const val ACTION_PREPARE_PROOT_UBUNTU = "dev.atdev.nexora.PREPARE_PROOT_UBUNTU"
+        const val ACTION_PROOT_INSTALL_FINISHED = "dev.atdev.nexora.PROOT_INSTALL_FINISHED"
         const val ACTION_START_QEMU_VM = "dev.atdev.nexora.START_QEMU_VM"
         const val ACTION_STOP_QEMU_VM = "dev.atdev.nexora.STOP_QEMU_VM"
         const val ACTION_QEMU_VM_INPUT = "dev.atdev.nexora.QEMU_VM_INPUT"
