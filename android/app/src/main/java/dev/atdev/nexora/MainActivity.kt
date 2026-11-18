@@ -438,7 +438,7 @@ class MainActivity : Activity() {
             clipToPadding = false
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
         }
-        panelScroll.addView(panel, ScrollView.LayoutParams(
+        panelScroll.addView(panel, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ))
