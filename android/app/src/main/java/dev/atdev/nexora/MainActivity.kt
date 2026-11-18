@@ -697,6 +697,7 @@ class MainActivity : Activity() {
     }
 
     private fun printWelcome() {
+        terminalOutput.clear()
         output.text = ""
         appendLine("NEXORA 0.3.0 — Android")
         appendLine("Shell: root@$hostname")
@@ -951,15 +952,10 @@ class MainActivity : Activity() {
         appendText("$value\n")
     }
 
+    private val terminalOutput = TerminalOutputBuffer(maxTerminalOutputChars)
+
     private fun appendText(value: String) {
-        output.append(value)
-        val current = output.text
-        if (current.length > maxTerminalOutputChars) {
-            val overflow = current.length - maxTerminalOutputChars
-            val nextLine = current.indexOf('\n', overflow)
-            val trimTo = if (nextLine >= 0) nextLine + 1 else overflow
-            output.text = current.subSequence(trimTo, current.length)
-        }
+        output.text = terminalOutput.append(value)
         output.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
