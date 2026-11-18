@@ -122,8 +122,8 @@ class UbuntuRootfsInstaller(context: Context) {
             resolvConf.delete()
         }
         resolvConf.parentFile?.mkdirs()
-        resolvConf.writeText(dnsServers.joinToString("\\n") { "nameserver $it" } + "\\n")
-        File(destination, "etc/hostname").writeText("nexora\\n")
+        resolvConf.writeText(dnsServers.joinToString("\n") { "nameserver $it" } + "\n")
+        File(destination, "etc/hostname").writeText("nexora\n")
     }
 
     private fun extractArchive(destination: File) {
