@@ -91,6 +91,14 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platform-tools" "ndk;23.2.8568313"
 
+      - name: Set up Python 3.11 for legacy PRoot build tools
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify Python compatibility
+        run: python --version && python -c "import imp; print('legacy imp module available')"
+
       - name: Build standalone PRoot for Android ARM64
         shell: bash
         run: |
