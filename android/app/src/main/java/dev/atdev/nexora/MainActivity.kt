@@ -758,7 +758,10 @@ class MainActivity : Activity() {
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
             else startService(serviceIntent)
         } catch (error: Exception) {
+            commandRunning = false
             input.isEnabled = true
+            input.hint = "Command…"
+            promptLabel.text = prompt
             appendLine("Could not start Ubuntu command: ${error.message}")
         }
     }
