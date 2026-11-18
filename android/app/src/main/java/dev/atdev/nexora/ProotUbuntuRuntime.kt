@@ -14,9 +14,10 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val app = context.applicationContext
     private val rootfs = File(app.filesDir, "proot/ubuntu")
     private val proot = File(app.applicationInfo.nativeLibraryDir, "libproot.so")
+    private val loader = File(app.applicationInfo.nativeLibraryDir, "libproot-loader.so")
 
     override fun isInstalled(): Boolean =
-        proot.isFile && proot.canRead() && proot.canExecute() &&
+        proot.isFile && proot.canRead() && proot.canExecute() && loader.isFile &&
             File(rootfs, "usr/bin/bash").isFile &&
             File(rootfs, "etc/os-release").isFile
 
@@ -28,6 +29,17 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     ) {
         Thread({
             try {
+                check(proot.isFile && proot.canExecute() && loader.isFile) {
+                    "This APK does not include the ARM64 PRoot runtime. Install the APK produced by NEXORA Android CI."
+                }
+                val version = ProcessBuilder(proot.absolutePath, "--version")
+                    .redirectErrorStream(true)
+                    .start()
+                val versionText = version.inputStream.bufferedReader().use { it.readText() }.trim()
+                check(version.waitFor(10, TimeUnit.SECONDS) && version.exitValue() == 0) {
+                    "The packaged PRoot executable failed its startup check: $versionText"
+                }
+                progress("PRoot runtime verified: $versionText")
                 progress("Preparing Ubuntu 24.04 ARM64 with PRoot…")
                 UbuntuRootfsInstaller(app).install(progress)
                 check(isInstalled()) { "Ubuntu root filesystem or packaged PRoot binary is missing." }
