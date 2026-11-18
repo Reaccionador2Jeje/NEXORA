@@ -103,7 +103,7 @@ jobs:
           destination="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
           mkdir -p "$destination"
           install -m 0755 "$output/libproot.so" "$destination/libproot.so"
-          install -m 0644 "$output/libproot-loader.so" "$destination/libproot-loader.so"
+          install -m 0755 "$output/libproot-loader.so" "$destination/libproot-loader.so"
           test -s "$destination/libproot.so"
           test -s "$destination/libproot-loader.so"
           file "$destination/libproot.so" "$destination/libproot-loader.so"
