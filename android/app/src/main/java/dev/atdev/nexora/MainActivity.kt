@@ -433,7 +433,16 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             Gravity.START
         )
-        overlay.addView(panel, panelParams)
+        val panelScroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+        }
+        panelScroll.addView(panel, ScrollView.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+        overlay.addView(panelScroll, panelParams)
 
         panel.addView(TextView(this).apply {
             text = "NEXORA"
@@ -610,7 +619,7 @@ class MainActivity : Activity() {
         panel.addView(storage, storageActionParams)
 
         val help = makeActionButton("⌨  COMMAND HELP", 0xFFBDEBFF.toInt(), 0xFF18334A.toInt(), false) {
-            appendLine("Commands: help, version, install-ubuntu, ubuntu-status, pwd, ls, cd, clear, exit")
+            appendLine("Commands: help, version, install-ubuntu, ubuntu-status, desktop install|password|start|stop|status|connect, pwd, ls, cd, clear, exit")
             decor.removeView(overlay)
         }
         val helpParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
@@ -904,7 +913,7 @@ class MainActivity : Activity() {
 
         val parts = line.split(Regex("\\s+"), limit = 2)
         when (parts[0].lowercase(Locale.ROOT)) {
-            "help" -> appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, pwd, ls, cd, exit")
+            "help" -> appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, desktop install|password|start|stop|status|connect, pwd, ls, cd, exit")
             "version" -> appendLine("NEXORA Android 0.5.0 (PRoot)")
             "clear", "cls" -> { output.clearTerminal() }
             "install-ubuntu" -> installUbuntuRuntime()
