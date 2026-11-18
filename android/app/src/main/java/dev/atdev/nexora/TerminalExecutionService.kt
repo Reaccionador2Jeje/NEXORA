@@ -281,6 +281,7 @@ class TerminalExecutionService : Service() {
     }
 
     companion object {
+        const val ACTION_EXECUTE_COMMAND = "dev.atdev.nexora.EXECUTE_COMMAND"
         const val ACTION_PREPARE_PROOT_UBUNTU = "dev.atdev.nexora.PREPARE_PROOT_UBUNTU"
         const val ACTION_PROOT_INSTALL_FINISHED = "dev.atdev.nexora.PROOT_INSTALL_FINISHED"
         const val ACTION_START_QEMU_VM = "dev.atdev.nexora.START_QEMU_VM"
