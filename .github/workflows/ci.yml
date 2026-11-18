@@ -131,6 +131,22 @@ jobs:
           test -s "$destination/libproot-loader.so"
           file "$destination/libproot.so" "$destination/libproot-loader.so"
 
+      - name: Build Android ARM64 PTY helper
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          ANDROID_NDK_HOME="$SDK_ROOT/ndk/23.2.8568313"
+          PTY_CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+          destination="$GITHUB_WORKSPACE/android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$destination"
+          "$PTY_CC" -O2 -Wall -Wextra -Werror -fPIE -pie \
+            "$GITHUB_WORKSPACE/android/app/src/main/cpp/nexora_pty.c" \
+            -o "$destination/libnexora-pty.so"
+          chmod 0755 "$destination/libnexora-pty.so"
+          file "$destination/libnexora-pty.so"
+          test -x "$destination/libnexora-pty.so"
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
