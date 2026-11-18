@@ -729,7 +729,7 @@ class MainActivity : Activity() {
             }
         }
         promptLabel.text = prompt
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        output.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun runUbuntuCommand(command: String) {
@@ -857,7 +857,7 @@ class MainActivity : Activity() {
 
     private fun appendText(value: String) {
         output.append(value)
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        output.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun dp(value: Int): Int =
