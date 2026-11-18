@@ -32,7 +32,7 @@ static unsigned short terminal_dimension(const char *name, unsigned short fallba
     if (!value || !*value) return fallback;
     char *end = NULL;
     unsigned long parsed = strtoul(value, &end, 10);
-    if (end == value || *end != '\\0') return fallback;
+    if (end == value || *end != '\0') return fallback;
     if (parsed < minimum) parsed = minimum;
     if (parsed > maximum) parsed = maximum;
     return (unsigned short) parsed;
