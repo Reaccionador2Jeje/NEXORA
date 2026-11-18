@@ -131,7 +131,9 @@ class TerminalExecutionService : Service() {
             buildNotification("Command finished (exit $code)", false)
         )
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf(startId)
+        // Input intents increment the service startId while a command is running.
+        // Stop the completed session regardless of those newer input start IDs.
+        stopSelf()
     }
 
     private fun sendOutput(line: String) {
