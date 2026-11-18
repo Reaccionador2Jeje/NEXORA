@@ -207,7 +207,7 @@ internal class TerminalView @JvmOverloads constructor(
     private fun eraseDisplay(mode: Int) {
         when (mode) {
             2, 3 -> { for (r in 0 until rows) for (c in 0 until cols) grid[r][c] = Cell(fg = fg, bg = bg) }
-            1 -> { for (r in 0..y) for (c in 0 until if (r == y) x + 1 else cols) grid[r][c] = Cell(fg = fg, bg = bg) }
+            1 -> { for (r in 0..y) for (c in 0 until (if (r == y) x + 1 else cols)) grid[r][c] = Cell(fg = fg, bg = bg) }
             else -> { for (r in y until rows) for (c in (if (r == y) x else 0) until cols) grid[r][c] = Cell(fg = fg, bg = bg) }
         }
     }
