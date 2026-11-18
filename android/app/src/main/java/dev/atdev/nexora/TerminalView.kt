@@ -130,7 +130,7 @@ internal class TerminalView @JvmOverloads constructor(
     }
 
     private fun handleCsi(final: Char, raw: String) {
-        val (private, p) = params(raw)
+        val (isPrivate, p) = params(raw)
         fun n(i: Int = 0, default: Int = 1) = (p.getOrNull(i) ?: 0).let { if (it == 0) default else it }
         when (final) {
             'A' -> y = (y - n()).coerceAtLeast(0)
@@ -154,7 +154,7 @@ internal class TerminalView @JvmOverloads constructor(
             '@' -> repeat(n()) { insertChar() }
             'P' -> repeat(n()) { deleteChar() }
             'X' -> repeat(n()) { grid[y][x] = Cell(fg = fg, bg = bg); x = minOf(cols - 1, x + 1) }
-            'h', 'l' -> if (private && p.contains(1049)) {
+            'h', 'l' -> if (isPrivate && p.contains(1049)) {
                 if (final == 'h') {
                     savedGrid = Array(rows) { r -> Array(cols) { c -> grid[r][c].copy() } }
                     clearTerminal()
@@ -210,7 +210,7 @@ internal class TerminalView @JvmOverloads constructor(
         when (mode) {
             2, 3 -> { for (r in 0 until rows) for (c in 0 until cols) grid[r][c] = Cell(fg = fg, bg = bg) }
             1 -> { for (r in 0..y) for (c in 0 until if (r == y) x + 1 else cols) grid[r][c] = Cell(fg = fg, bg = bg) }
-            else -> { for (r in y until rows) for (c in if (r == y) x else 0 until cols) grid[r][c] = Cell(fg = fg, bg = bg) }
+            else -> { for (r in y until rows) for (c in (if (r == y) x else 0) until cols) grid[r][c] = Cell(fg = fg, bg = bg) }
         }
     }
 
@@ -281,7 +281,7 @@ internal class TerminalView @JvmOverloads constructor(
     }
 
     private fun colorFor(index: Int, custom: Int?): Int =
-        custom ?: palette[index.coerceIn(0, palette.lastIndex)]
+        custom ?: if (index in 0..15) palette[index] else index
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }
