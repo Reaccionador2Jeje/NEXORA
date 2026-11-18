@@ -19,6 +19,16 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val installMarker = File(app.filesDir, "proot/ubuntu-base.sha256")
     // PRoot creates host-side glue and probe directories here. Android app cache is private and writable.
     private val prootTempDir = File(app.cacheDir, "proot-tmp")
+    private val sessionDirectory = File(app.filesDir, "proot/session")
+    private val sessionCwdFile = File(sessionDirectory, "cwd")
+
+    override fun currentWorkingDirectory(): String {
+        val saved = runCatching { sessionCwdFile.readText().trim() }.getOrNull().orEmpty()
+        if (!saved.startsWith("/")) return "/root"
+        val guestPath = saved.removePrefix("/")
+        val directory = File(rootfs, guestPath).canonicalFile
+        return if (directory.isDirectory && directory.path.startsWith(rootfs.canonicalPath + File.separator)) saved else "/root"
+    }
 
     override fun isInstalled(): Boolean =
         proot.isFile && proot.canRead() && proot.canExecute() &&
@@ -84,6 +94,13 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
         Thread({
             var exitCode = 1
             try {
+                prepareSessionDirectory()
+                val sessionCwd = currentWorkingDirectory()
+                val commandWithSession = command + "\n" +
+                    "__nexora_status=\$?\n" +
+                    "printf '%s' \"\$PWD\" > /tmp/nexora-session/cwd\n" +
+                    "exit \"\$__nexora_status\""
+
                 val args = mutableListOf(
                     proot.absolutePath,
                     "--kill-on-exit",
@@ -95,7 +112,8 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                     "-b", "/sys",
                     "-b", "/system",
                     "-b", "/apex",
-                    "-w", "/root"
+                    "-b", "${sessionDirectory.absolutePath}:/tmp/nexora-session",
+                    "-w", sessionCwd
                 )
                 if (androidShared != null && androidShared.isDirectory) {
                     args += listOf("-b", "${androidShared.absolutePath}:/mnt/android")
@@ -109,7 +127,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                     "TERM=xterm-256color",
                     "LANG=C.UTF-8",
                     "HOSTNAME=nexora",
-                    "/bin/bash", "-lc", command
+                    "/bin/bash", "-lc", commandWithSession
                 )
 
                 prepareProotTempDir()
@@ -148,6 +166,18 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
             }
         }, "nexora-proot-command").start()
     }
+    /** Creates persistent host-side state shared with the Ubuntu rootfs. */
+    private fun prepareSessionDirectory() {
+        check(sessionDirectory.isDirectory || sessionDirectory.mkdirs()) {
+            "Cannot create Ubuntu session directory."
+        }
+        if (!sessionCwdFile.isFile || sessionCwdFile.readText().isBlank()) {
+            check(sessionCwdFile.writeText("/root").let { sessionCwdFile.isFile }) {
+                "Cannot initialize Ubuntu working directory."
+            }
+        }
+    }
+
     /** Creates and verifies the host-side temporary directory required by PRoot. */
     private fun prepareProotTempDir() {
         check(prootTempDir.isDirectory || prootTempDir.mkdirs()) {
