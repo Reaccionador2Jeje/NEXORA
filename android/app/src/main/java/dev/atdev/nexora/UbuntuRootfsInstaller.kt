@@ -140,6 +140,7 @@ class UbuntuRootfsInstaller(context: Context) {
         val root = destination.canonicalFile
         GzipCompressorInputStream(archive.inputStream().buffered()).use { gzip ->
             TarArchiveInputStream(gzip).use { tar ->
+                val hardLinks = mutableListOf<Pair<File, File>>()
                 while (true) {
                     val entry = tar.nextTarEntry ?: break
                     val output = File(root, entry.name).canonicalFile
@@ -164,8 +165,7 @@ class UbuntuRootfsInstaller(context: Context) {
                                 "Ubuntu archive contains an unsafe hard link."
                             }
                             output.parentFile?.mkdirs()
-                            check(target.exists()) { "Ubuntu archive hard link target is missing." }
-                            java.nio.file.Files.createLink(output.toPath(), target.toPath())
+                            hardLinks.add(output to target)
                         }
                         entry.isFile -> {
                             output.parentFile?.mkdirs()
@@ -181,6 +181,14 @@ class UbuntuRootfsInstaller(context: Context) {
                             output.setWritable(entry.mode and 0b010010010 != 0, false)
                             output.setExecutable(entry.mode and 0b001001001 != 0, false)
                         }
+                    }
+                }
+                hardLinks.forEach { (link, target) ->
+                    check(target.exists()) { "Ubuntu archive hard link target is missing: $target" }
+                    try {
+                        java.nio.file.Files.createLink(link.toPath(), target.toPath())
+                    } catch (_: Exception) {
+                        java.nio.file.Files.copy(target.toPath(), link.toPath())
                     }
                 }
             }
