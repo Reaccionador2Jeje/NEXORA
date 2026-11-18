@@ -756,7 +756,8 @@ class MainActivity : Activity() {
             "qemu-status" -> {
                 val diskReady = File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile
                 val seedReady = File(filesDir, "qemu/vm/cidata.img").isFile
-                val qemuReady = File(filesDir, "qemu/arm64-v8a/qemu-system-aarch64").isFile
+                val qemuExecutable = File(applicationInfo.nativeLibraryDir, "libqemu-system-aarch64.so")
+                val qemuReady = qemuExecutable.isFile && qemuExecutable.canExecute()
                 val firmwareReady = File(filesDir, "qemu/firmware/aavmf/AAVMF_CODE.fd").isFile
                 appendLine("QEMU VM: ${if (qemuVmActive) "RUNNING" else "STOPPED"}")
                 appendLine("QEMU Android binary: ${if (qemuReady) "installed" else "missing"}")
