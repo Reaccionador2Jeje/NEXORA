@@ -57,6 +57,8 @@ class MainActivity : Activity() {
             when (intent?.action) {
                 TerminalExecutionService.ACTION_OUTPUT ->
                     appendLine(intent.getStringExtra(TerminalExecutionService.EXTRA_OUTPUT).orEmpty())
+                TerminalExecutionService.ACTION_OUTPUT_CHUNK ->
+                    appendText(intent.getStringExtra(TerminalExecutionService.EXTRA_OUTPUT).orEmpty())
                 TerminalExecutionService.ACTION_FINISHED -> {
                     val code = intent.getIntExtra(TerminalExecutionService.EXTRA_EXIT_CODE, 1)
                     appendLine("[process exited with code $code]")
@@ -608,6 +610,7 @@ class MainActivity : Activity() {
         if (terminalReceiverRegistered) return
         val filter = IntentFilter().apply {
             addAction(TerminalExecutionService.ACTION_OUTPUT)
+            addAction(TerminalExecutionService.ACTION_OUTPUT_CHUNK)
             addAction(TerminalExecutionService.ACTION_FINISHED)
             addAction(TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED)
         }
@@ -805,7 +808,7 @@ class MainActivity : Activity() {
         when (key) {
             "ESC" -> Unit
             "TAB" -> insertText("    ")
-            "CTRL" -> Toast.makeText(this, "Commands run individually; Ctrl+C is not available yet.", Toast.LENGTH_SHORT).show()
+            "CTRL" -> Toast.makeText(this, "Use Ctrl+C to interrupt the running process.", Toast.LENGTH_SHORT).show()
             "ALT" -> Unit
             "←" -> moveCursor(-1)
             "→" -> moveCursor(1)
@@ -823,7 +826,10 @@ class MainActivity : Activity() {
             }
             "HOME" -> input.setSelection(0)
             "END" -> input.setSelection(input.text.length)
-            "Ctrl+C" -> { input.text.clear(); appendLine("^C") }
+            "Ctrl+C" -> {
+                if (commandRunning) sendTerminalInput("\u0003")
+                else { input.text.clear(); appendLine("^C") }
+            }
             else -> insertText(key)
         }
         input.requestFocus()
