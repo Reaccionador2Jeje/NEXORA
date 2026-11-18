@@ -425,7 +425,7 @@ class MainActivity : Activity() {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(22), dp(18), dp(18))
-            background = roundedBackground(intArrayOf(0xFF142238.toInt(), 0xFF0B1422.toInt()), 0)
+            background = roundedBackground(intArrayOf(0xFF14231F.toInt(), 0xFF0B1413.toInt()), 0)
             elevation = dp(16).toFloat()
         }
         val panelParams = FrameLayout.LayoutParams(
@@ -446,7 +446,7 @@ class MainActivity : Activity() {
             text = "WORKSPACE & SETTINGS"
             textSize = 9f
             letterSpacing = 0.15f
-            setTextColor(0xFF7DD3FC.toInt())
+            setTextColor(0xFFB7F36B.toInt())
             setPadding(0, dp(3), 0, dp(18))
         })
 
@@ -455,7 +455,7 @@ class MainActivity : Activity() {
             textSize = 9f
             letterSpacing = 0.14f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF8295B3.toInt())
+            setTextColor(0xFF78968A.toInt())
             setPadding(dp(2), dp(2), 0, dp(8))
         }
         panel.addView(authHeading)
@@ -465,11 +465,11 @@ class MainActivity : Activity() {
             textSize = 11f
             setTextColor(0xFFE1EDFC.toInt())
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = roundedBackground(intArrayOf(0xFF101A2A.toInt(), 0xFF101A2A.toInt()), 12)
+            background = roundedBackground(intArrayOf(0xFF111C1A.toInt(), 0xFF111C1A.toInt()), 12)
         }
         panel.addView(accountLabel)
 
-        val githubLogin = makeActionButton("⌘  CONTINUE WITH GITHUB", 0xFFFFFFFF.toInt(), 0xFF26364E.toInt(), false) {
+        val githubLogin = makeActionButton("⌘  CONTINUE WITH GITHUB", 0xFFFFFFFF.toInt(), 0xFF1A2924.toInt(), false) {
             decor.removeView(overlay)
             startProviderLogin("github")
         }
@@ -477,7 +477,7 @@ class MainActivity : Activity() {
         githubParams.topMargin = dp(7)
         panel.addView(githubLogin, githubParams)
 
-        val signOut = makeActionButton("SIGN OUT", 0xFFFECACA.toInt(), 0xFF3B202B.toInt(), false) {
+        val signOut = makeActionButton("SIGN OUT", 0xFFFECACA.toInt(), 0xFF3A2524.toInt(), false) {
             decor.removeView(overlay)
             supabaseAuth.signOut { result ->
                 result.onSuccess {
@@ -495,13 +495,13 @@ class MainActivity : Activity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(14), dp(14), dp(14))
-            background = roundedBackground(intArrayOf(0xFF193858.toInt(), 0xFF17243D.toInt()), 16)
+            background = roundedBackground(intArrayOf(0xFF1B3329.toInt(), 0xFF14221E.toInt()), 16)
         }
         hero.addView(TextView(this).apply {
             text = "LINUX, IN YOUR POCKET"
             textSize = 10f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF7DD3FC.toInt())
+            setTextColor(0xFFB7F36B.toInt())
         })
         hero.addView(TextView(this).apply {
             text = "Ubuntu 24.04 LTS"
@@ -513,11 +513,11 @@ class MainActivity : Activity() {
         hero.addView(TextView(this).apply {
             text = "A rootless Ubuntu ARM64 environment powered by PRoot."
             textSize = 11f
-            setTextColor(0xFFB6C8E2.toInt())
+            setTextColor(0xFFB5C9BD.toInt())
         })
         panel.addView(hero)
 
-        val install = makeActionButton("↓  INSTALL / REPAIR UBUNTU", 0xFF06243A.toInt(), 0xFF38BDF8.toInt(), true) {
+        val install = makeActionButton("↓  INSTALL / REPAIR UBUNTU", 0xFF06243A.toInt(), 0xFF8EDB64.toInt(), true) {
             decor.removeView(overlay)
             installUbuntuRuntime()
         }
@@ -525,7 +525,7 @@ class MainActivity : Activity() {
         installParams.topMargin = dp(14)
         panel.addView(install, installParams)
 
-        val status = makeActionButton("◉  CHECK UBUNTU STATUS", 0xFFD5E7FF.toInt(), 0xFF263B5A.toInt(), false) {
+        val status = makeActionButton("◉  CHECK UBUNTU STATUS", 0xFFDCEFE4.toInt(), 0xFF1A2924.toInt(), false) {
             appendLine(if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04: installed and ready." else "Ubuntu 24.04: not installed.")
             updateRuntimeStatus()
             decor.removeView(overlay)
@@ -539,12 +539,12 @@ class MainActivity : Activity() {
             textSize = 9f
             letterSpacing = 0.14f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF8295B3.toInt())
+            setTextColor(0xFF78968A.toInt())
             setPadding(dp(2), dp(22), 0, dp(8))
         }
         panel.addView(section)
 
-        val runtimeCard = makeInfoCard("UBUNTU RUNTIME", if (ubuntuRuntime.isInstalled()) "●  READY" else "○  NOT INSTALLED", 0xFF7DD3FC.toInt())
+        val runtimeCard = makeInfoCard("UBUNTU RUNTIME", if (ubuntuRuntime.isInstalled()) "●  READY" else "○  NOT INSTALLED", 0xFFB7F36B.toInt())
         runtimeStatus = runtimeCard.second
         panel.addView(runtimeCard.first, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70)))
         val storageCard = makeInfoCard("ANDROID STORAGE", if (preferences.getString("android_tree_uri", null) != null) "●  Connected" else "○  Not connected", 0xFFC4B5FD.toInt())
@@ -659,14 +659,14 @@ class MainActivity : Activity() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(11), dp(10), dp(9))
-            background = roundedBackground(intArrayOf(0xFF141F32.toInt(), 0xFF101A2A.toInt()), 15)
+            background = roundedBackground(intArrayOf(0xFF141F32.toInt(), 0xFF111C1A.toInt()), 15)
         }
         card.addView(TextView(this).apply {
             text = title
             textSize = 8f
             letterSpacing = 0.1f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF8295B3.toInt())
+            setTextColor(0xFF78968A.toInt())
         })
         val valueView = TextView(this).apply {
             text = value
