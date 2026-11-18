@@ -92,7 +92,7 @@ class MainActivity : Activity() {
     private val supabaseAuth by lazy { SupabaseAuth(this) }
     private val preferences by lazy { getSharedPreferences("nexora", MODE_PRIVATE) }
     private val prompt: String
-        get() = "$username@$hostname:${displayPath()}$ "
+        get() = "root@$hostname:${displayPath()}# "
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -713,7 +713,7 @@ class MainActivity : Activity() {
     }
 
     private fun displayPath(): String =
-        if (workingDirectory == filesDir) "~" else "~/${workingDirectory.relativeTo(filesDir).path}"
+        ubuntuRuntime.currentWorkingDirectory().let { if (it == "/root") "~" else it }
 
     private fun submitCommand() {
         val rawLine = input.text.toString()
@@ -755,7 +755,6 @@ class MainActivity : Activity() {
                 if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 ARM64 through PRoot: ready"
                 else "Ubuntu 24.04 ARM64 through PRoot: not installed"
             )
-            "exit", "logout" -> appendLine("Each command runs in its own Ubuntu process. No persistent shell is active.")
             else -> {
                 if (!ubuntuRuntime.isInstalled()) {
                     appendLine("Ubuntu is not installed. Run install-ubuntu first.")
