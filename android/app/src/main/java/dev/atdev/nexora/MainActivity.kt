@@ -534,6 +534,54 @@ class MainActivity : Activity() {
         statusParams.topMargin = dp(8)
         panel.addView(status, statusParams)
 
+        val desktopHeading = TextView(this).apply {
+            text = "LINUX DESKTOP  •  XFCE / VNC"
+            textSize = 9f
+            letterSpacing = 0.14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFB7F36B.toInt())
+            setPadding(dp(2), dp(18), 0, dp(7))
+        }
+        panel.addView(desktopHeading)
+
+        val desktopInstall = makeActionButton("▣  INSTALL XFCE + TIGERVNC", 0xFF06243A.toInt(), 0xFF8EDB64.toInt(), true) {
+            decor.removeView(overlay)
+            runDesktopAction("install")
+        }
+        panel.addView(desktopInstall, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43)))
+
+        val desktopPassword = makeActionButton("⌑  SET VNC PASSWORD", 0xFFDCEFE4.toInt(), 0xFF1A2924.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("password")
+        }
+        val desktopPasswordParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopPasswordParams.topMargin = dp(6)
+        panel.addView(desktopPassword, desktopPasswordParams)
+
+        val desktopStart = makeActionButton("▶  START DESKTOP", 0xFFB8F7D4.toInt(), 0xFF17352F.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("start")
+        }
+        val desktopStartParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopStartParams.topMargin = dp(6)
+        panel.addView(desktopStart, desktopStartParams)
+
+        val desktopStop = makeActionButton("■  STOP DESKTOP", 0xFFFECACA.toInt(), 0xFF3A2524.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("stop")
+        }
+        val desktopStopParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopStopParams.topMargin = dp(6)
+        panel.addView(desktopStop, desktopStopParams)
+
+        val desktopStatus = makeActionButton("◉  DESKTOP STATUS", 0xFFDCEFE4.toInt(), 0xFF1A2924.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("status")
+        }
+        val desktopStatusParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopStatusParams.topMargin = dp(6)
+        panel.addView(desktopStatus, desktopStatusParams)
+
         val section = TextView(this).apply {
             text = "CONNECTIONS"
             textSize = 9f
@@ -864,6 +912,7 @@ class MainActivity : Activity() {
                 if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 ARM64 through PRoot: ready"
                 else "Ubuntu 24.04 ARM64 through PRoot: not installed"
             )
+            "desktop" -> handleDesktopCommand(parts.getOrNull(1).orEmpty())
             else -> {
                 if (!ubuntuRuntime.isInstalled()) {
                     appendLine("Ubuntu is not installed. Run install-ubuntu first.")
@@ -874,6 +923,44 @@ class MainActivity : Activity() {
         }
         promptLabel.text = prompt
         output.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun handleDesktopCommand(argument: String) {
+        if (!ubuntuRuntime.isInstalled()) {
+            appendLine("Ubuntu is not installed. Run install-ubuntu first.")
+            return
+        }
+        when (argument.trim().lowercase(Locale.ROOT)) {
+            "install" -> {
+                appendLine("Installing XFCE, DBus and TigerVNC…")
+                runUbuntuCommand(DesktopCommands.INSTALL)
+            }
+            "password" -> {
+                appendLine("Set a VNC access password. The terminal will ask you to enter it twice.")
+                runUbuntuCommand(DesktopCommands.SET_PASSWORD)
+            }
+            "start" -> {
+                appendLine("Starting XFCE desktop on localhost:5901…")
+                runUbuntuCommand(DesktopCommands.START)
+            }
+            "stop" -> runUbuntuCommand(DesktopCommands.STOP)
+            "status" -> runUbuntuCommand(DesktopCommands.STATUS)
+            "connect" -> {
+                appendLine("Open a VNC Viewer app and connect to 127.0.0.1:5901.")
+                appendLine("Keep NEXORA running in the background while using the viewer.")
+            }
+            else -> appendLine(
+                "Desktop commands: desktop install | password | start | stop | status | connect"
+            )
+        }
+    }
+
+    private fun runDesktopAction(action: String) {
+        if (!ubuntuRuntime.isInstalled()) {
+            appendLine("Ubuntu is not installed. Run INSTALL / REPAIR UBUNTU first.")
+            return
+        }
+        handleDesktopCommand(action)
     }
 
     private fun runUbuntuCommand(command: String) {
