@@ -123,7 +123,7 @@ class UbuntuRootfsInstaller(context: Context) {
                         }
                         entry.isSymbolicLink -> {
                             output.parentFile?.mkdirs()
-                            if (output.exists() || output.isSymbolicLink()) output.delete()
+                            if (output.exists() || java.nio.file.Files.isSymbolicLink(output.toPath())) output.delete()
                             java.nio.file.Files.createSymbolicLink(
                                 output.toPath(),
                                 java.nio.file.Paths.get(entry.linkName)
