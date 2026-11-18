@@ -15,6 +15,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val rootfs = File(app.filesDir, "proot/ubuntu")
     private val proot = File(app.applicationInfo.nativeLibraryDir, "libproot.so")
     private val loader = File(app.applicationInfo.nativeLibraryDir, "libproot-loader.so")
+    private val ptyHelper = File(app.applicationInfo.nativeLibraryDir, "libnexora-pty.so")
     private val installMarker = File(app.filesDir, "proot/ubuntu-base.sha256")
     // PRoot creates host-side glue and probe directories here. Android app cache is private and writable.
     private val prootTempDir = File(app.cacheDir, "proot-tmp")
@@ -106,7 +107,10 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                 )
 
                 prepareProotTempDir()
-                val process = ProcessBuilder(args)
+                check(ptyHelper.isFile && ptyHelper.canExecute()) {
+                    "NEXORA PTY helper is missing. Install the APK built by the latest Android CI."
+                }
+                val process = ProcessBuilder(listOf(ptyHelper.absolutePath) + args)
                     .directory(rootfs)
                     .redirectErrorStream(true)
                     .apply {
@@ -122,10 +126,12 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                         // The process may have exited while the user was typing.
                     }
                 }
-                BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                InputStreamReader(process.inputStream, Charsets.UTF_8).use { reader ->
+                    val buffer = CharArray(4096)
                     while (true) {
-                        val output = reader.readLine() ?: break
-                        line(output)
+                        val count = reader.read(buffer)
+                        if (count < 0) break
+                        if (count > 0) line(String(buffer, 0, count))
                     }
                 }
                 exitCode = process.waitFor()
