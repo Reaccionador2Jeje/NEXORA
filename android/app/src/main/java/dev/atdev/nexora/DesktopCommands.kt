@@ -13,7 +13,10 @@ object DesktopCommands {
 
     const val SET_PASSWORD = "vncpasswd"
 
-    const val START = """mkdir -p "$HOME/.vnc" && printf '%s\n' '#!/bin/sh' 'unset SESSION_MANAGER' 'unset DBUS_SESSION_BUS_ADDRESS' 'exec dbus-launch --exit-with-session startxfce4' > "$HOME/.vnc/xstartup" && chmod 700 "$HOME/.vnc/xstartup" && tigervncserver :1 -localhost yes -geometry 1280x720 -depth 24"""
+    // Keep the PRoot process alive while the VNC server is running. PRoot's
+    // --kill-on-exit option would otherwise terminate the detached Xvnc child.
+    // Ctrl+C from the terminal triggers the trap and cleanly stops the server.
+    const val START = """mkdir -p "$HOME/.vnc" && printf '%s\n' '#!/bin/sh' 'unset SESSION_MANAGER' 'unset DBUS_SESSION_BUS_ADDRESS' 'exec dbus-launch --exit-with-session startxfce4' > "$HOME/.vnc/xstartup" && chmod 700 "$HOME/.vnc/xstartup" && tigervncserver :1 -localhost yes -geometry 1280x720 -depth 24 || exit $?; trap 'tigervncserver -kill :1 >/dev/null 2>&1 || true' EXIT INT TERM; echo 'XFCE desktop active on 127.0.0.1:5901. Use Stop Desktop to end the session.'; while tigervncserver -list 2>/dev/null | grep -q ':1'; do sleep 2; done"""
 
     const val STOP = "tigervncserver -kill :1"
 
