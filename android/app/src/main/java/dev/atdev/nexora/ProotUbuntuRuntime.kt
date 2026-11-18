@@ -172,6 +172,10 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
         check(sessionDirectory.isDirectory || sessionDirectory.mkdirs()) {
             "Cannot create Ubuntu session directory."
         }
+        val guestMountPoint = File(rootfs, "tmp/nexora-session")
+        check(guestMountPoint.isDirectory || guestMountPoint.mkdirs()) {
+            "Cannot create Ubuntu session mount point."
+        }
         if (!sessionCwdFile.isFile || sessionCwdFile.readText().isBlank()) {
             check(sessionCwdFile.writeText("/root").let { sessionCwdFile.isFile }) {
                 "Cannot initialize Ubuntu working directory."
