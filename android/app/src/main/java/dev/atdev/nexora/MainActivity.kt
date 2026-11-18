@@ -222,7 +222,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "/", "-", "|", "~", "Ctrl+C")
+        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "/", "-", "|", "~", "Ctrl+C", "Ctrl+D", "Ctrl+Z")
         keys.forEach { key ->
             val keyView = TextView(this).apply {
                 text = key
@@ -717,12 +717,17 @@ class MainActivity : Activity() {
         input.text.clear()
         if (commandRunning) {
             when {
-                ctrlModifierArmed && rawLine.isNotEmpty() -> {
-                    val key = rawLine.first().uppercaseChar()
-                    if (key in 'A'..'Z') sendTerminalInput((key.code - 64).toChar().toString(), appendNewline = false)
-                    else sendTerminalInput(rawLine)
+                ctrlModifierArmed && rawLine.length == 1 -> {
+                    val key = rawLine[0].uppercaseChar()
+                    if (key in 'A'..'Z') {
+                        sendTerminalInput((key.code - 64).toChar().toString(), appendNewline = false)
+                    } else {
+                        appendLine("CTRL expects one letter (A–Z).")
+                    }
                 }
-                altModifierArmed && rawLine.isNotEmpty() -> sendTerminalInput("\u001B$rawLine")
+                ctrlModifierArmed -> appendLine("CTRL expects one letter (A–Z).")
+                altModifierArmed && rawLine.isNotEmpty() ->
+                    sendTerminalInput("\u001B$rawLine", appendNewline = false)
                 else -> sendTerminalInput(rawLine)
             }
             ctrlModifierArmed = false
@@ -853,6 +858,8 @@ class MainActivity : Activity() {
                 if (commandRunning) sendTerminalInput("\u0003", appendNewline = false)
                 else { input.text.clear(); appendLine("^C") }
             }
+            "Ctrl+D" -> if (commandRunning) sendTerminalInput("\u0004", appendNewline = false) else insertText(key)
+            "Ctrl+Z" -> if (commandRunning) sendTerminalInput("\u001A", appendNewline = false) else insertText(key)
             else -> insertText(key)
         }
         input.requestFocus()
