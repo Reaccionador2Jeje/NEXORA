@@ -135,6 +135,18 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(13), dp(8), dp(13), dp(9))
+            // Keep the command dock and terminal shortcut keys above Android's
+            // gesture/navigation bar, including Android 15 edge-to-edge mode.
+            setOnApplyWindowInsetsListener { view, insets ->
+                val navigationBottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+                } else {
+                    @Suppress("DEPRECATION")
+                    insets.systemWindowInsetBottom
+                }
+                view.setPadding(dp(13), dp(8), dp(13), dp(9) + navigationBottom)
+                insets
+            }
         }
 
         val header = LinearLayout(this).apply {
