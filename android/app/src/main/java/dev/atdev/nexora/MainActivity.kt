@@ -222,7 +222,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "/", "-", "|", "~", "Ctrl+C", "Ctrl+D", "Ctrl+Z")
+        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "/", "-", "|", "~", "Ctrl+C", "Ctrl+D", "Ctrl+U", "Ctrl+W")
         keys.forEach { key ->
             val keyView = TextView(this).apply {
                 text = key
@@ -859,7 +859,8 @@ class MainActivity : Activity() {
                 else { input.text.clear(); appendLine("^C") }
             }
             "Ctrl+D" -> if (commandRunning) sendTerminalInput("\u0004", appendNewline = false) else insertText(key)
-            "Ctrl+Z" -> if (commandRunning) sendTerminalInput("\u001A", appendNewline = false) else insertText(key)
+            "Ctrl+U" -> if (commandRunning) sendTerminalInput("\u0015", appendNewline = false) else insertText(key)
+            "Ctrl+W" -> if (commandRunning) sendTerminalInput("\u0017", appendNewline = false) else insertText(key)
             else -> insertText(key)
         }
         input.requestFocus()
