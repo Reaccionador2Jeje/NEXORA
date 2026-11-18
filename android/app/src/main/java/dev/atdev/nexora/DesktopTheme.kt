@@ -81,7 +81,20 @@ cat > "${'$'}HOME/.local/bin-nexora-theme.sh" <<'NEXORA_AUTOSTART'
 xfconf-query -c xsettings -p /Net/ThemeName -s NEXORA --create -t string
 xfconf-query -c xsettings -p /Net/IconThemeName -s Papirus-Dark --create -t string
 xfconf-query -c xfwm4 -p /general/theme -s NEXORA --create -t string || true
-xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/last-image -s "$HOME/.local/share/backgrounds/nexora-wallpaper.svg" --create -t string
+xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/last-image -s "${' --create -t string
+xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/image-style -s 5 --create -t int
+NEXORA_AUTOSTART
+chmod 700 "${'$'}HOME/.local/bin-nexora-theme.sh" && cat > "${'$'}HOME/.config/autostart/nexora-theme.desktop" <<'NEXORA_DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=NEXORA Desktop Theme
+Comment=Apply NEXORA's dark neon desktop identity
+Exec=sh -c "${'
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+NEXORA_DESKTOP"""
+}
+}HOME/.local/share/backgrounds/nexora-wallpaper.svg" --create -t string
 xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/image-style -s 5 --create -t int
 NEXORA_AUTOSTART
 chmod 700 "${'$'}HOME/.local/bin-nexora-theme.sh" && cat > "${'$'}HOME/.config/autostart/nexora-theme.desktop" <<'NEXORA_DESKTOP'
@@ -90,6 +103,29 @@ Type=Application
 Name=NEXORA Desktop Theme
 Comment=Apply NEXORA's dark neon desktop identity
 Exec=sh -c "$HOME/.local/bin-nexora-theme.sh"
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+NEXORA_DESKTOP"""
+}
+}HOME/.local/bin-nexora-theme.sh"
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+NEXORA_DESKTOP"""
+}
+}HOME/.local/share/backgrounds/nexora-wallpaper.svg" --create -t string
+xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/workspace0/image-style -s 5 --create -t int
+NEXORA_AUTOSTART
+chmod 700 "${'$'}HOME/.local/bin-nexora-theme.sh" && cat > "${'$'}HOME/.config/autostart/nexora-theme.desktop" <<'NEXORA_DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=NEXORA Desktop Theme
+Comment=Apply NEXORA's dark neon desktop identity
+Exec=sh -c "${'
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+NEXORA_DESKTOP"""
+}
+}HOME/.local/bin-nexora-theme.sh"
 OnlyShowIn=XFCE;
 X-GNOME-Autostart-enabled=true
 NEXORA_DESKTOP"""
