@@ -204,7 +204,7 @@ class UbuntuRootfsInstaller(context: Context) {
     }
 
     companion object {
-        private const val BASE_URL = "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release"
+        private const val BASE_URL = "https://cdimage.ubuntu.com/cdimage/ubuntu-base/releases/24.04/release"
         private const val IMAGE_NAME = "ubuntu-base-24.04.5-base-arm64.tar.gz"
     }
 }
