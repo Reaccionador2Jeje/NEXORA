@@ -188,7 +188,7 @@ internal class TerminalView @JvmOverloads constructor(
                     i += 2
                 } else if (p.getOrNull(i + 1) == 2 && p.size > i + 4) {
                     val color = android.graphics.Color.rgb(p[i + 2].coerceIn(0,255), p[i + 3].coerceIn(0,255), p[i + 4].coerceIn(0,255))
-                    if (v == 38) customFg = color else customBg = color
+                    if (v == 38) fg = color else bg = color
                     i += 4
                 }
             }
@@ -196,8 +196,6 @@ internal class TerminalView @JvmOverloads constructor(
         }
     }
 
-    private var customFg: Int? = null
-    private var customBg: Int? = null
     private fun ansi256(v: Int): Int {
         if (v < 16) return v
         if (v >= 232) { val c = 8 + (v - 232) * 10; return android.graphics.Color.rgb(c,c,c) }
@@ -262,12 +260,12 @@ internal class TerminalView @JvmOverloads constructor(
                 val reverse = cell.inverse xor inverse
                 val back = if (reverse) cell.fg else cell.bg
                 if (back != 0) {
-                    terminalPaint.color = colorFor(back, if (reverse) customFg else customBg)
+                    terminalPaint.color = colorFor(back, null)
                     canvas.drawRect(paddingLeft + c * cellWidth, paddingTop + r * lineHeight,
                         paddingLeft + (c + 1) * cellWidth, paddingTop + (r + 1) * lineHeight, terminalPaint)
                 }
                 if (cell.ch != ' ') {
-                    terminalPaint.color = colorFor(if (reverse) cell.bg else cell.fg, if (reverse) customBg else customFg)
+                    terminalPaint.color = colorFor(if (reverse) cell.bg else cell.fg, null)
                     terminalPaint.isFakeBoldText = cell.bold
                     canvas.drawText(cell.ch.toString(), paddingLeft + c * cellWidth, base + r * lineHeight, terminalPaint)
                 }
