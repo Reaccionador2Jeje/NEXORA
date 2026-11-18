@@ -20,8 +20,11 @@ class UbuntuRootfsInstaller(context: Context) {
     fun install(progress: (String) -> Unit) {
         check(installDir.exists() || installDir.mkdirs()) { "Cannot create the PRoot workspace." }
         val expected = fetchExpectedHash()
-        if (File(rootfs, "usr/bin/bash").isFile && marker.isFile &&
-            marker.readText().trim() == expected) {
+        val markerHash = if (marker.isFile) marker.readLines().firstOrNull() else null
+        if (File(rootfs, "usr/bin/bash").isFile && markerHash == expected) {
+            progress("Repairing Ubuntu app-owned filesystem permissions…")
+            normalizePermissions(rootfs)
+            marker.writeText("$expected\nowner-writable-v1")
             progress("Ubuntu Base 24.04 ARM64 is already installed and verified.")
             return
         }
@@ -35,6 +38,7 @@ class UbuntuRootfsInstaller(context: Context) {
             extractArchive(staging)
             check(File(staging, "usr/bin/bash").isFile) { "Ubuntu archive is missing /usr/bin/bash." }
             check(File(staging, "etc/os-release").isFile) { "Ubuntu archive is missing /etc/os-release." }
+            normalizePermissions(staging)
             configureRootfs(staging)
             val backup = File(installDir, "ubuntu.previous")
             backup.deleteRecursively()
@@ -48,7 +52,7 @@ class UbuntuRootfsInstaller(context: Context) {
             backup.deleteRecursively()
             File(rootfs, "root").mkdirs()
             File(rootfs, "mnt/android").mkdirs()
-            marker.writeText(expected)
+            marker.writeText("$expected\nowner-writable-v1")
             progress("Ubuntu Base 24.04 ARM64 installed and SHA-256 verified.")
         } catch (error: Exception) {
             staging.deleteRecursively()
@@ -177,9 +181,12 @@ class UbuntuRootfsInstaller(context: Context) {
                                     stream.write(buffer, 0, count)
                                 }
                             }
-                            output.setReadable(entry.mode and 0b100100100 != 0, false)
-                            output.setWritable(entry.mode and 0b010010010 != 0, false)
-                            output.setExecutable(entry.mode and 0b001001001 != 0, false)
+                            // PRoot emulates root but cannot bypass Android's real file
+                            // permissions. The app UID owns this rootfs, so keep files
+                            // owner-readable/writable and preserve executable bits.
+                            output.setReadable(true, true)
+                            output.setWritable(true, true)
+                            output.setExecutable(entry.mode and 0b001001001 != 0, true)
                         }
                     }
                 }
@@ -191,6 +198,21 @@ class UbuntuRootfsInstaller(context: Context) {
                         java.nio.file.Files.copy(target.toPath(), link.toPath())
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Makes the private rootfs writable by the Android app UID.
+     * PRoot's fake-root mode cannot override host filesystem permissions.
+     */
+    private fun normalizePermissions(destination: File) {
+        destination.walkTopDown().forEach { entry ->
+            if (java.nio.file.Files.isSymbolicLink(entry.toPath())) return@forEach
+            entry.setReadable(true, true)
+            entry.setWritable(true, true)
+            if (entry.isDirectory) {
+                entry.setExecutable(true, true)
             }
         }
     }
