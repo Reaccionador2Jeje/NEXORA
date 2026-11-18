@@ -16,6 +16,8 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val proot = File(app.applicationInfo.nativeLibraryDir, "libproot.so")
     private val loader = File(app.applicationInfo.nativeLibraryDir, "libproot-loader.so")
     private val installMarker = File(app.filesDir, "proot/ubuntu-base.sha256")
+    // PRoot creates host-side glue and probe directories here. Android app cache is private and writable.
+    private val prootTempDir = File(app.cacheDir, "proot-tmp")
 
     override fun isInstalled(): Boolean =
         proot.isFile && proot.canRead() && proot.canExecute() && loader.isFile && loader.canExecute() &&
@@ -44,6 +46,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                 check(version.exitValue() == 0) {
                     "The packaged PRoot executable failed its startup check: $versionText"
                 }
+                prepareProotTempDir()
                 progress("PRoot runtime verified: $versionText")
                 progress("Preparing Ubuntu 24.04 ARM64 with PRoot…")
                 UbuntuRootfsInstaller(app).install(progress)
@@ -101,9 +104,14 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                     "/bin/bash", "-lc", command
                 )
 
+                prepareProotTempDir()
                 val process = ProcessBuilder(args)
                     .directory(rootfs)
                     .redirectErrorStream(true)
+                    .apply {
+                        environment()["PROOT_TMP_DIR"] = prootTempDir.absolutePath
+                        environment()["TMPDIR"] = prootTempDir.absolutePath
+                    }
                     .start()
                 BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
                     while (true) {
@@ -119,6 +127,18 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
             }
         }, "nexora-proot-command").start()
     }
+    /** Creates and verifies the host-side temporary directory required by PRoot. */
+    private fun prepareProotTempDir() {
+        check(prootTempDir.isDirectory || prootTempDir.mkdirs()) {
+            "Cannot create PRoot temporary directory in app cache."
+        }
+        val probe = File(prootTempDir, ".nexora-host-write-check")
+        check(probe.writeText("ok").let { probe.isFile && probe.readText() == "ok" }) {
+            "Android does not allow writing to PRoot temporary directory: ${prootTempDir.absolutePath}"
+        }
+        check(probe.delete()) { "Cannot clean PRoot temporary directory write check." }
+    }
+
     /**
      * Exercises the write locations commonly used by shells and package managers.
      * This catches Android host-permission problems before the terminal is marked ready.
@@ -144,9 +164,14 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
             "TERM=xterm", "LANG=C.UTF-8",
             "/bin/bash", "-lc", command
         )
+        prepareProotTempDir()
         val process = ProcessBuilder(args)
             .redirectErrorStream(true)
             .redirectOutput(checkLog)
+            .apply {
+                environment()["PROOT_TMP_DIR"] = prootTempDir.absolutePath
+                environment()["TMPDIR"] = prootTempDir.absolutePath
+            }
             .start()
         if (!process.waitFor(30, TimeUnit.SECONDS)) {
             process.destroyForcibly()
@@ -157,7 +182,9 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
         checkLog.delete()
         check(process.exitValue() == 0 &&
             output.contains("NEXORA_PROOT_PERMISSION_CHECK_OK") &&
-            !output.contains("Permission denied", ignoreCase = true)) {
+            !output.contains("Permission denied", ignoreCase = true) &&
+            !output.contains("proot error", ignoreCase = true) &&
+            !output.contains("proot warning", ignoreCase = true)) {
             "PRoot filesystem permission self-check failed: ${output.trim()}"
         }
     }
