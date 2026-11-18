@@ -4,7 +4,7 @@ import java.io.File
 
 /**
  * Runtime boundary used by the Android UI and execution service.
- * The Android implementation boots a persistent ARM64 Ubuntu VM with QEMU.
+ * The Android implementation runs an ARM64 Ubuntu rootfs through PRoot.
  */
 interface LinuxRuntimeEngine {
     fun isInstalled(): Boolean
@@ -26,8 +26,8 @@ interface LinuxRuntimeEngine {
     )
 }
 
-/** QEMU is the only active Android Linux runtime. */
+/** PRoot is the primary Android Linux runtime. */
 object LinuxRuntimeFactory {
     fun create(context: android.content.Context): LinuxRuntimeEngine =
-        QemuUbuntuRuntime(context.applicationContext)
+        ProotUbuntuRuntime(context.applicationContext)
 }
