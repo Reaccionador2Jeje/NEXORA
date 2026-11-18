@@ -48,7 +48,8 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                 progress("Preparing Ubuntu 24.04 ARM64 with PRoot…")
                 UbuntuRootfsInstaller(app).install(progress)
                 check(isInstalled()) { "Ubuntu root filesystem or packaged PRoot binary is missing." }
-                done(true, "Ubuntu 24.04 ARM64 is ready through PRoot. Run Linux commands directly.", 1000)
+                verifyRootfsPermissions()
+                done(true, "Ubuntu 24.04 ARM64 is ready through PRoot. Filesystem permission checks passed.", 1000)
             } catch (error: Exception) {
                 done(false, error.message ?: "Ubuntu PRoot installation failed.", -1)
             }
@@ -118,4 +119,48 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
             }
         }, "nexora-proot-command").start()
     }
+    /**
+     * Exercises the write locations commonly used by shells and package managers.
+     * This catches Android host-permission problems before the terminal is marked ready.
+     */
+    private fun verifyRootfsPermissions() {
+        val checkLog = File(app.cacheDir, "proot-permission-check.log")
+        val command = "set -eu; test \"\$(id -u)\" = 0; " +
+            "touch /tmp/.nexora-proot-write-check; " +
+            "mkdir -p /var/lib/nexora-proot-write-check; " +
+            "printf ok > /var/lib/nexora-proot-write-check/check; " +
+            "printf ok > /root/.nexora-proot-write-check; " +
+            "rm -rf /var/lib/nexora-proot-write-check /tmp/.nexora-proot-write-check " +
+            "/root/.nexora-proot-write-check; " +
+            "echo NEXORA_PROOT_PERMISSION_CHECK_OK"
+        val args = listOf(
+            proot.absolutePath, "--kill-on-exit", "--link2symlink", "-0",
+            "-r", rootfs.absolutePath,
+            "-b", "/dev", "-b", "/proc", "-b", "/sys", "-b", "/system", "-b", "/apex",
+            "-w", "/root",
+            "/usr/bin/env", "-i",
+            "HOME=/root", "USER=root", "LOGNAME=root",
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "TERM=xterm", "LANG=C.UTF-8",
+            "/bin/bash", "-lc", command
+        )
+        val process = ProcessBuilder(args)
+            .redirectErrorStream(true)
+            .redirectOutput(checkLog)
+            .start()
+        if (!process.waitFor(30, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            checkLog.delete()
+            error("PRoot filesystem permission self-check timed out.")
+        }
+        val output = checkLog.takeIf { it.isFile }?.readText().orEmpty()
+        checkLog.delete()
+        check(process.exitValue() == 0 &&
+            output.contains("NEXORA_PROOT_PERMISSION_CHECK_OK") &&
+            !output.contains("Permission denied", ignoreCase = true)) {
+            "PRoot filesystem permission self-check failed: ${output.trim()}"
+        }
+    }
+
+
 }
