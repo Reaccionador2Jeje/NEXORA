@@ -87,7 +87,7 @@ class TerminalExecutionService : Service() {
                     uid,
                     if (treeUri != null) bridge.sharedDirectory else null,
                     { line ->
-                        sendOutput(line)
+                        sendOutputChunk(line)
                         updateNotification("Running Ubuntu command")
                     },
                     { writer -> activeInput = writer }
@@ -135,6 +135,10 @@ class TerminalExecutionService : Service() {
 
     private fun sendOutput(line: String) {
         sendBroadcast(Intent(ACTION_OUTPUT).setPackage(packageName).putExtra(EXTRA_OUTPUT, line))
+    }
+
+    private fun sendOutputChunk(chunk: String) {
+        sendBroadcast(Intent(ACTION_OUTPUT_CHUNK).setPackage(packageName).putExtra(EXTRA_OUTPUT, chunk))
     }
 
     private fun updateNotification(message: String) {
@@ -195,6 +199,7 @@ class TerminalExecutionService : Service() {
         const val EXTRA_INSTALL_SUCCESS = "install_success"
         const val EXTRA_INSTALL_MESSAGE = "install_message"
         const val ACTION_OUTPUT = "dev.atdev.nexora.TERMINAL_OUTPUT"
+        const val ACTION_OUTPUT_CHUNK = "dev.atdev.nexora.TERMINAL_OUTPUT_CHUNK"
         const val ACTION_FINISHED = "dev.atdev.nexora.TERMINAL_FINISHED"
     }
 }
