@@ -21,7 +21,9 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val prootTempDir = File(app.cacheDir, "proot-tmp")
 
     override fun isInstalled(): Boolean =
-        proot.isFile && proot.canRead() && proot.canExecute() && loader.isFile && loader.canExecute() &&
+        proot.isFile && proot.canRead() && proot.canExecute() &&
+            loader.isFile && loader.canRead() && loader.canExecute() &&
+            ptyHelper.isFile && ptyHelper.canRead() && ptyHelper.canExecute() &&
             File(rootfs, "usr/bin/bash").isFile &&
             File(rootfs, "etc/os-release").isFile && installMarker.isFile
 
@@ -33,8 +35,12 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     ) {
         Thread({
             try {
-                check(proot.isFile && proot.canExecute() && loader.isFile && loader.canExecute()) {
-                    "This APK does not include the ARM64 PRoot runtime. Install the APK produced by NEXORA Android CI."
+                check(proot.isFile && proot.canRead() && proot.canExecute() &&
+                    loader.isFile && loader.canRead() && loader.canExecute()) {
+                    "This APK does not include the ARM64 PRoot runtime and loader. Install the APK produced by NEXORA Android CI."
+                }
+                check(ptyHelper.isFile && ptyHelper.canRead() && ptyHelper.canExecute()) {
+                    "This APK does not include the NEXORA PTY helper. Install the latest Android CI build."
                 }
                 val version = ProcessBuilder(proot.absolutePath, "--version")
                     .redirectErrorStream(true)
