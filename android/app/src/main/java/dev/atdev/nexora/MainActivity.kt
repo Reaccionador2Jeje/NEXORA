@@ -50,7 +50,6 @@ class MainActivity : Activity() {
     private lateinit var ubuntuRuntime: LinuxRuntimeEngine
     private var ubuntuUid = 10000
     private var terminalReceiverRegistered = false
-    private var qemuVmActive = false
 
     private val terminalReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -64,30 +63,12 @@ class MainActivity : Activity() {
                     promptLabel.text = prompt
                     input.requestFocus()
                 }
-                TerminalExecutionService.ACTION_QEMU_INSTALL_FINISHED -> {
+                TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED -> {
                     val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_QEMU_INSTALL_SUCCESS, false)
                     val message = intent.getStringExtra(TerminalExecutionService.EXTRA_QEMU_INSTALL_MESSAGE).orEmpty()
                     input.isEnabled = true
-                    appendLine(if (success) message else "QEMU Ubuntu preparation failed: $message")
-                    if (success) appendLine("Run qemu-start to boot the Ubuntu virtual machine.")
+                    appendLine(if (success) message else "PRoot Ubuntu preparation failed: $message")
                     updateRuntimeStatus()
-                    promptLabel.text = prompt
-                    input.requestFocus()
-                }
-                TerminalExecutionService.ACTION_QEMU_SERIAL_OUTPUT ->
-                    appendText(intent.getStringExtra(TerminalExecutionService.EXTRA_QEMU_SERIAL_TEXT).orEmpty())
-                TerminalExecutionService.ACTION_QEMU_VM_STARTED -> {
-                    qemuVmActive = true
-                    input.isEnabled = true
-                    appendLine("QEMU VM process is active. Serial terminal input is connected.")
-                    promptLabel.text = prompt
-                    input.requestFocus()
-                }
-                TerminalExecutionService.ACTION_QEMU_VM_STOPPED -> {
-                    qemuVmActive = false
-                    input.isEnabled = true
-                    val code = intent.getIntExtra(TerminalExecutionService.EXTRA_QEMU_VM_EXIT, 0)
-                    appendLine("QEMU VM is stopped (exit $code).")
                     promptLabel.text = prompt
                     input.requestFocus()
                 }
@@ -624,9 +605,6 @@ class MainActivity : Activity() {
             addAction(TerminalExecutionService.ACTION_OUTPUT)
             addAction(TerminalExecutionService.ACTION_FINISHED)
             addAction(TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED)
-            addAction(TerminalExecutionService.ACTION_QEMU_VM_STARTED)
-            addAction(TerminalExecutionService.ACTION_QEMU_VM_STOPPED)
-            addAction(TerminalExecutionService.ACTION_QEMU_SERIAL_OUTPUT)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(terminalReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -635,9 +613,6 @@ class MainActivity : Activity() {
             registerReceiver(terminalReceiver, filter)
         }
         terminalReceiverRegistered = true
-        startService(Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_QUERY_QEMU_VM
-        })
     }
 
     // Keep the receiver registered while the Activity is stopped so progress
@@ -775,83 +750,6 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun startQemuVm() {
-        if (qemuVmActive) {
-            appendLine("QEMU Ubuntu VM is already running.")
-            return
-        }
-        val disk = File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2")
-        val seed = File(filesDir, "qemu/vm/cidata.img")
-        if (!disk.isFile || !seed.isFile) {
-            appendLine("QEMU Ubuntu VM is not prepared. Run qemu-install first.")
-            return
-        }
-        input.isEnabled = false
-        appendLine("Starting Ubuntu ARM64 under QEMU TCG (offline mode; guest networking is not built yet)…")
-        val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_START_QEMU_VM
-        }
-        try {
-            if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
-            else startService(serviceIntent)
-        } catch (error: Exception) {
-            input.isEnabled = true
-            appendLine("Could not start QEMU: ${error.message}")
-        }
-    }
-
-    private fun stopQemuVm() {
-        if (!qemuVmActive) {
-            appendLine("QEMU Ubuntu VM is not running.")
-            return
-        }
-        appendLine("Requesting Ubuntu VM shutdown…")
-        startService(Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_STOP_QEMU_VM
-        })
-    }
-
-    private fun sendQemuInput(command: String) {
-        sendQemuSerial("$command\n")
-    }
-
-    private fun sendQemuSerial(text: String) {
-        try {
-            startService(Intent(this, TerminalExecutionService::class.java).apply {
-                action = TerminalExecutionService.ACTION_QEMU_VM_INPUT
-                putExtra(TerminalExecutionService.EXTRA_QEMU_INPUT, text)
-            })
-        } catch (error: Exception) {
-            appendLine("Could not send input to QEMU: ${error.message}")
-        }
-    }
-
-    /** Verifies the packaged Android QEMU executable without starting a guest VM. */
-    private fun checkQemuRuntime() {
-        input.isEnabled = false
-        appendLine("Checking standalone QEMU for Android ARM64…")
-        Thread {
-            val result = runCatching {
-                val installer = QemuBinaryInstaller(this)
-                val installed = installer.installFromAssets()
-                installer.smokeTest(installed)
-            }
-            runOnUiThread {
-                result.onSuccess { version ->
-                    appendLine("QEMU Android runtime: VERIFIED")
-                    appendLine(version)
-                    appendLine("The executable and its Android shared libraries start correctly.")
-                    appendLine("QEMU is verified. Run install-ubuntu to prepare Ubuntu, then qemu-start.")
-                }.onFailure { error ->
-                    appendLine("QEMU runtime check failed: ${error.message ?: "unknown error"}")
-                }
-                input.isEnabled = true
-                promptLabel.text = prompt
-                input.requestFocus()
-            }
-        }.start()
-    }
-
     private fun installUbuntuRuntime() {
         if (ubuntuRuntime.isInstalled()) {
             appendLine("Ubuntu through PRoot is already prepared.")
@@ -875,8 +773,7 @@ class MainActivity : Activity() {
     }
 
     private fun handleShortcut(key: String) {
-        if (qemuVmActive) {
-            when (key) {
+        when (key) {
                 "ESC" -> sendQemuSerial("\u001B")
                 "TAB" -> sendQemuSerial("\t")
                 "←" -> sendQemuSerial("\u001B[D")
