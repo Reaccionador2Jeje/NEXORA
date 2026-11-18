@@ -14,6 +14,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -215,6 +217,40 @@ class MainActivity : Activity() {
         }
         promptRow.addView(runButton, LinearLayout.LayoutParams(dp(42), dp(40)))
         root.addView(promptRow)
+
+        // While a foreground program is active, send committed keyboard text
+        // directly to its PTY instead of waiting for a whole command line.
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(editable: Editable?) {
+                if (!commandRunning || ctrlModifierArmed || altModifierArmed) return
+                val value = editable?.toString().orEmpty()
+                if (value.isNotEmpty()) {
+                    sendTerminalInput(value, appendNewline = false)
+                    editable?.clear()
+                }
+            }
+        })
+        input.setOnKeyListener { _, keyCode, event ->
+            if (!commandRunning || event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            val sequence = when (keyCode) {
+                KeyEvent.KEYCODE_DEL -> "\u007F"
+                KeyEvent.KEYCODE_DPAD_UP -> "\u001B[A"
+                KeyEvent.KEYCODE_DPAD_DOWN -> "\u001B[B"
+                KeyEvent.KEYCODE_DPAD_RIGHT -> "\u001B[C"
+                KeyEvent.KEYCODE_DPAD_LEFT -> "\u001B[D"
+                KeyEvent.KEYCODE_MOVE_HOME -> "\u001B[H"
+                KeyEvent.KEYCODE_MOVE_END -> "\u001B[F"
+                KeyEvent.KEYCODE_TAB -> "\t"
+                KeyEvent.KEYCODE_ESCAPE -> "\u001B"
+                else -> null
+            }
+            if (sequence != null) {
+                sendTerminalInput(sequence, appendNewline = false)
+                true
+            } else false
+        }
 
         // Keyboard rail is immediately accessible, above the terminal output.
         val shortcutsScroll = HorizontalScrollView(this).apply {
@@ -697,7 +733,6 @@ class MainActivity : Activity() {
     }
 
     private fun printWelcome() {
-        terminalOutput.clear()
         output.clearTerminal()
         appendLine("NEXORA 0.3.0 — Android")
         appendLine("Shell: root@$hostname")
@@ -751,7 +786,7 @@ class MainActivity : Activity() {
         when (parts[0].lowercase(Locale.ROOT)) {
             "help" -> appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, pwd, ls, cd, exit")
             "version" -> appendLine("NEXORA Android 0.5.0 (PRoot)")
-            "clear", "cls" -> { terminalOutput.clear(); output.clearTerminal() }
+            "clear", "cls" -> { output.clearTerminal() }
             "install-ubuntu" -> installUbuntuRuntime()
             "ubuntu-status" -> appendLine(
                 if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 ARM64 through PRoot: ready"
@@ -951,8 +986,6 @@ class MainActivity : Activity() {
     private fun appendLine(value: String) {
         appendText("$value\n")
     }
-
-    private val terminalOutput = TerminalOutputBuffer(maxTerminalOutputChars)
 
     private fun appendText(value: String) {
         output.feed(value)
