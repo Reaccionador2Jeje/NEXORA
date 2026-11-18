@@ -176,10 +176,10 @@ internal class TerminalView @JvmOverloads constructor(
                 22 -> bold = false
                 7 -> inverse = true
                 27 -> inverse = false
-                30..37 -> fg = v - 30
-                40..47 -> bg = v - 40
-                90..97 -> fg = v - 90 + 8
-                100..107 -> bg = v - 100 + 8
+                in 30..37 -> fg = v - 30
+                in 40..47 -> bg = v - 40
+                in 90..97 -> fg = v - 90 + 8
+                in 100..107 -> bg = v - 100 + 8
                 39 -> fg = 7
                 49 -> bg = 0
                 38, 48 -> if (p.getOrNull(i + 1) == 5 && p.size > i + 2) {
