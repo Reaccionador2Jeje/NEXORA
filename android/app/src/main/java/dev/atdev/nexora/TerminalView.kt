@@ -124,9 +124,9 @@ internal class TerminalView @JvmOverloads constructor(
     }
 
     private fun params(raw: String): Pair<Boolean, List<Int>> {
-        val private = raw.startsWith("?")
+        val isPrivate = raw.startsWith("?")
         val clean = raw.removePrefix("?").removeSuffix(" ")
-        return private to clean.split(';').map { it.toIntOrNull() ?: 0 }
+        return isPrivate to clean.split(';').map { it.toIntOrNull() ?: 0 }
     }
 
     private fun handleCsi(final: Char, raw: String) {
