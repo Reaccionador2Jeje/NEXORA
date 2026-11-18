@@ -9,6 +9,9 @@ import java.io.File
 interface LinuxRuntimeEngine {
     fun isInstalled(): Boolean
 
+    /** Current working directory inside the Ubuntu rootfs. */
+    fun currentWorkingDirectory(): String = "/root"
+
     fun install(
         user: String,
         hostname: String,
