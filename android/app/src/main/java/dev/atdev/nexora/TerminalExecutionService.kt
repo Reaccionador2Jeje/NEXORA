@@ -16,11 +16,22 @@ import java.io.File
 class TerminalExecutionService : Service() {
     private val notificationId = 4101
     private val channelId = "nexora_terminal_tasks"
+    @Volatile private var activeInput: ((String) -> Unit)? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
+        if (action == ACTION_SEND_INPUT) {
+            val value = intent.getStringExtra(EXTRA_INPUT).orEmpty()
+            val writer = activeInput
+            if (writer != null) {
+                writer(value + "\\n")
+            } else {
+                sendOutput("nex: no running process is accepting input.")
+            }
+            return START_NOT_STICKY
+        }
         val prepareUbuntu = action == ACTION_PREPARE_PROOT_UBUNTU
         val command = intent?.getStringExtra(EXTRA_COMMAND)
         val username = intent?.getStringExtra(EXTRA_USERNAME) ?: "user"
@@ -69,6 +80,7 @@ class TerminalExecutionService : Service() {
                         prefs.edit().putString("android_tree_imported_uri", treeUri.toString()).apply()
                     }
                 }
+                activeInput = null
                 LinuxRuntimeFactory.create(this).execute(
                     command.orEmpty(),
                     username,
@@ -77,8 +89,10 @@ class TerminalExecutionService : Service() {
                     { line ->
                         sendOutput(line)
                         updateNotification("Running Ubuntu command")
-                    }
+                    },
+                    { writer -> activeInput = writer }
                 ) { code ->
+                    activeInput = null
                     finishCommand(startId, code, treeUri, bridge)
                 }
             } catch (error: Exception) {
@@ -169,7 +183,9 @@ class TerminalExecutionService : Service() {
         const val ACTION_PREPARE_PROOT_UBUNTU = "dev.atdev.nexora.PREPARE_PROOT_UBUNTU"
         const val ACTION_PROOT_INSTALL_FINISHED = "dev.atdev.nexora.PROOT_INSTALL_FINISHED"
         const val ACTION_EXECUTE_COMMAND = "dev.atdev.nexora.EXECUTE_COMMAND"
+        const val ACTION_SEND_INPUT = "dev.atdev.nexora.SEND_TERMINAL_INPUT"
         const val EXTRA_COMMAND = "command"
+        const val EXTRA_INPUT = "terminal_input"
         const val EXTRA_USERNAME = "username"
         const val EXTRA_HOSTNAME = "hostname"
         const val EXTRA_UID = "uid"
