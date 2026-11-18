@@ -16,11 +16,14 @@ import android.os.Bundle
 import android.text.InputType
 import android.text.Editable
 import android.text.TextWatcher
+import android.text.Spanned
+import android.text.BaseInputConnection
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
@@ -74,7 +77,7 @@ class MainActivity : Activity() {
                     input.isEnabled = true
                     input.hint = "Command…"
                     promptLabel.text = prompt
-                    input.requestFocus()
+                    keepKeyboardOpen()
                 }
                 TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED -> {
                     val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_INSTALL_SUCCESS, false)
@@ -85,7 +88,7 @@ class MainActivity : Activity() {
                     appendLine(if (success) message else "PRoot Ubuntu preparation failed: $message")
                     updateRuntimeStatus()
                     promptLabel.text = prompt
-                    input.requestFocus()
+                    keepKeyboardOpen()
                 }
             }
         }
@@ -203,7 +206,11 @@ class MainActivity : Activity() {
                 val enter = actionId == EditorInfo.IME_ACTION_SEND ||
                     actionId == EditorInfo.IME_ACTION_DONE ||
                     (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)
-                if (enter) { submitCommand(); true } else false
+                if (enter) {
+                    submitCommand()
+                    keepKeyboardOpen()
+                    true
+                } else false
             }
         }
         promptRow.addView(input, LinearLayout.LayoutParams(0, dp(46), 1f))
@@ -227,6 +234,11 @@ class MainActivity : Activity() {
                 if (!commandRunning || ctrlModifierArmed || altModifierArmed) return
                 val value = editable?.toString().orEmpty()
                 if (value.isNotEmpty()) {
+                    // Never clear an active IME composing region: doing so resets
+                    // Gboard's input connection and can dismiss the Android keyboard.
+                    val composingStart = editable?.let { BaseInputConnection.getComposingSpanStart(it) } ?: -1
+                    val composingEnd = editable?.let { BaseInputConnection.getComposingSpanEnd(it) } ?: -1
+                    if (composingStart >= 0 || composingEnd >= 0) return
                     sendTerminalInput(value, appendNewline = false)
                     editable?.clear()
                 }
@@ -328,6 +340,7 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ))
         setContentView(frame)
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         updateRuntimeStatus()
         updateFolderStatus()
     }
@@ -754,6 +767,7 @@ class MainActivity : Activity() {
 
     private fun submitCommand() {
         val rawLine = input.text.toString()
+        keepKeyboardOpen()
         input.text.clear()
         if (commandRunning) {
             when {
@@ -807,6 +821,7 @@ class MainActivity : Activity() {
     private fun runUbuntuCommand(command: String) {
         commandRunning = true
         input.isEnabled = true
+        keepKeyboardOpen()
         input.hint = "Input to process…"
         promptLabel.text = "stdin ›"
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
@@ -903,7 +918,17 @@ class MainActivity : Activity() {
             "Ctrl+W" -> if (commandRunning) sendTerminalInput("\u0017", appendNewline = false) else insertText(key)
             else -> insertText(key)
         }
+        keepKeyboardOpen()
+    }
+
+    /** Keep the Android IME attached while commands and full-screen programs run. */
+    private fun keepKeyboardOpen() {
+        if (!::input.isInitialized || !input.isEnabled) return
         input.requestFocus()
+        input.post {
+            val manager = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+            manager?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     private fun insertText(value: String) {
@@ -988,8 +1013,10 @@ class MainActivity : Activity() {
     }
 
     private fun appendText(value: String) {
+        // Preserve the user's reading position when they scroll up through logs.
+        val wasAtBottom = scroll.height + scroll.scrollY >= scroll.getChildAt(0).height - dp(48)
         output.feed(value)
-        output.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        if (wasAtBottom) output.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
     private fun dp(value: Int): Int =
