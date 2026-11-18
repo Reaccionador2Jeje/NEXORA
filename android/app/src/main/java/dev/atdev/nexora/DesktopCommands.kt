@@ -13,7 +13,7 @@ object DesktopCommands {
 
     const val SET_PASSWORD = "vncpasswd"
 
-    const val START = """mkdir -p "$HOME/.vnc" && printf '%s\\n' '#!/bin/sh' 'unset SESSION_MANAGER' 'unset DBUS_SESSION_BUS_ADDRESS' 'exec dbus-launch --exit-with-session startxfce4' > "$HOME/.vnc/xstartup" && chmod 700 "$HOME/.vnc/xstartup" && tigervncserver :1 -localhost yes -geometry 1280x720 -depth 24"""
+    const val START = """mkdir -p "$HOME/.vnc" && printf '%s\n' '#!/bin/sh' 'unset SESSION_MANAGER' 'unset DBUS_SESSION_BUS_ADDRESS' 'exec dbus-launch --exit-with-session startxfce4' > "$HOME/.vnc/xstartup" && chmod 700 "$HOME/.vnc/xstartup" && tigervncserver :1 -localhost yes -geometry 1280x720 -depth 24"""
 
     const val STOP = "tigervncserver -kill :1"
 
