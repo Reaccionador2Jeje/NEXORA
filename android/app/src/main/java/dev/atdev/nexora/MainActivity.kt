@@ -641,14 +641,14 @@ class MainActivity : Activity() {
                 setSingleLine(true)
             }
 
-        val userField = field("Username (e.g. cris)")
-        val hostField = field("Hostname (e.g. nexora)")
+        val userField = field("Prompt username (e.g. cris)")
+        val hostField = field("Prompt hostname (e.g. nexora)")
         panel.addView(userField)
         panel.addView(hostField)
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Configure Ubuntu")
-            .setMessage("Choose the Linux username and hostname for your Ubuntu environment.")
+            .setMessage("These values customize the NEXORA prompt. Ubuntu currently runs as root inside PRoot.")
             .setView(panel)
             .setCancelable(false)
             .setPositiveButton("Create profile", null)
