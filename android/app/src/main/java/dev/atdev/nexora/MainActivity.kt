@@ -64,8 +64,8 @@ class MainActivity : Activity() {
                     input.requestFocus()
                 }
                 TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED -> {
-                    val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_QEMU_INSTALL_SUCCESS, false)
-                    val message = intent.getStringExtra(TerminalExecutionService.EXTRA_QEMU_INSTALL_MESSAGE).orEmpty()
+                    val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_INSTALL_SUCCESS, false)
+                    val message = intent.getStringExtra(TerminalExecutionService.EXTRA_INSTALL_MESSAGE).orEmpty()
                     input.isEnabled = true
                     appendLine(if (success) message else "PRoot Ubuntu preparation failed: $message")
                     updateRuntimeStatus()
