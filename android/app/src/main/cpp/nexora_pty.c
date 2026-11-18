@@ -26,6 +26,18 @@ static int write_all(int fd, const char *data, size_t length) {
     return 0;
 }
 
+static unsigned short terminal_dimension(const char *name, unsigned short fallback,
+                                         unsigned short minimum, unsigned short maximum) {
+    const char *value = getenv(name);
+    if (!value || !*value) return fallback;
+    char *end = NULL;
+    unsigned long parsed = strtoul(value, &end, 10);
+    if (end == value || *end != '\\0') return fallback;
+    if (parsed < minimum) parsed = minimum;
+    if (parsed > maximum) parsed = maximum;
+    return (unsigned short) parsed;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
         dprintf(STDERR_FILENO, "nexora-pty: missing command\n");
@@ -60,7 +72,12 @@ int main(int argc, char **argv) {
         if (slave < 0) _exit(126);
         if (ioctl(slave, TIOCSCTTY, 0) < 0) _exit(126);
 
-        struct winsize size = { .ws_row = 24, .ws_col = 80, .ws_xpixel = 0, .ws_ypixel = 0 };
+        struct winsize size = {
+            .ws_row = terminal_dimension("NEXORA_PTY_ROWS", 24, 8, 100),
+            .ws_col = terminal_dimension("NEXORA_PTY_COLS", 80, 20, 240),
+            .ws_xpixel = 0,
+            .ws_ypixel = 0
+        };
         (void)ioctl(slave, TIOCSWINSZ, &size);
 
         if (dup2(slave, STDIN_FILENO) < 0 ||

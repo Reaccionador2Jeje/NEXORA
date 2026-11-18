@@ -141,6 +141,9 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                     .apply {
                         environment()["PROOT_TMP_DIR"] = prootTempDir.absolutePath
                         environment()["TMPDIR"] = prootTempDir.absolutePath
+                        val metrics = app.resources.displayMetrics
+                        environment()["NEXORA_PTY_COLS"] = ((metrics.widthPixels / metrics.scaledDensity) / 7.5f).toInt().coerceIn(20, 240).toString()
+                        environment()["NEXORA_PTY_ROWS"] = "24"
                     }
                     .start()
                 onInputReady { value ->
