@@ -414,7 +414,8 @@ mod tests {
         fs::write(&path, b"abc").unwrap();
 
         let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-        super::verify_sha256(&path, expected).unwrap_or_else(|error| panic!("SHA-256 verification failed: {error}"));
+        super::verify_sha256(&path, expected)
+            .unwrap_or_else(|error| panic!("SHA-256 verification failed: {error}"));
         fs::remove_file(path).unwrap();
     }
 }
