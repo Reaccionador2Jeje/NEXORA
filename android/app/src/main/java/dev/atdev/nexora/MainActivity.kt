@@ -57,6 +57,7 @@ class MainActivity : Activity() {
     private var ubuntuUid = 10000
     private var terminalReceiverRegistered = false
     private var commandRunning = false
+    private var desktopSessionRunning = false
     private var ctrlModifierArmed = false
     private var altModifierArmed = false
 
@@ -71,6 +72,7 @@ class MainActivity : Activity() {
                     val code = intent.getIntExtra(TerminalExecutionService.EXTRA_EXIT_CODE, 1)
                     appendLine("[process exited with code $code]")
                     commandRunning = false
+                    desktopSessionRunning = false
                     ctrlModifierArmed = false
                     altModifierArmed = false
                     input.isEnabled = true
@@ -939,7 +941,12 @@ class MainActivity : Activity() {
             appendLine("Ubuntu is not installed. Run install-ubuntu first.")
             return
         }
-        when (argument.trim().lowercase(Locale.ROOT)) {
+        val action = argument.trim().lowercase(Locale.ROOT)
+        if (commandRunning && action != "stop" && action != "connect") {
+            appendLine("A terminal session is already active. Stop the desktop session before running another desktop action.")
+            return
+        }
+        when (action) {
             "install" -> {
                 appendLine("Installing XFCE, DBus and TigerVNC…")
                 runUbuntuCommand(DesktopCommands.INSTALL)
@@ -950,9 +957,17 @@ class MainActivity : Activity() {
             }
             "start" -> {
                 appendLine("Starting XFCE desktop on localhost:5901…")
+                desktopSessionRunning = true
                 runUbuntuCommand(DesktopCommands.START)
             }
-            "stop" -> runUbuntuCommand(DesktopCommands.STOP)
+            "stop" -> {
+                if (desktopSessionRunning && commandRunning) {
+                    appendLine("Stopping XFCE and TigerVNC…")
+                    sendTerminalInput("\u0003", appendNewline = false)
+                } else {
+                    runUbuntuCommand(DesktopCommands.STOP)
+                }
+            }
             "status" -> runUbuntuCommand(DesktopCommands.STATUS)
             "connect" -> {
                 appendLine("Open a VNC Viewer app and connect to 127.0.0.1:5901.")
@@ -990,6 +1005,7 @@ class MainActivity : Activity() {
             else startService(serviceIntent)
         } catch (error: Exception) {
             commandRunning = false
+            desktopSessionRunning = false
             input.isEnabled = true
             input.hint = "Command…"
             promptLabel.text = prompt
