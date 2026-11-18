@@ -26,7 +26,7 @@ class TerminalExecutionService : Service() {
             val value = intent.getStringExtra(EXTRA_INPUT).orEmpty()
             val writer = activeInput
             if (writer != null) {
-                writer(value + "\\n")
+                writer(value + "\n")
             } else {
                 sendOutput("nex: no running process is accepting input.")
             }
