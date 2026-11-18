@@ -91,13 +91,17 @@ jobs:
       - name: Install Android SDK packages
         run: sdkmanager "platform-tools" "ndk;23.2.8568313"
 
-      - name: Set up Python 3.11 for legacy PRoot build tools
-        uses: actions/setup-python@v5
+      - name: Set up Python 2.7 for legacy PRoot build tools
+        uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: '3.11'
+          python-version: '2.7'
+          channels: conda-forge
+          activate-environment: proot-build
+          auto-activate-base: false
 
-      - name: Verify Python compatibility
-        run: python --version && python -c "import imp; print('legacy imp module available')"
+      - name: Verify legacy Waf runtime
+        shell: bash -el {0}
+        run: python --version && python -c "import imp; print('Python 2 legacy Waf runtime available')"
 
       - name: Build standalone PRoot for Android ARM64
         shell: bash
