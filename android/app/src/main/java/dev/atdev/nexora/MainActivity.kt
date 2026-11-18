@@ -774,25 +774,9 @@ class MainActivity : Activity() {
 
     private fun handleShortcut(key: String) {
         when (key) {
-                "ESC" -> sendQemuSerial("\u001B")
-                "TAB" -> sendQemuSerial("\t")
-                "←" -> sendQemuSerial("\u001B[D")
-                "→" -> sendQemuSerial("\u001B[C")
-                "↑" -> sendQemuSerial("\u001B[A")
-                "↓" -> sendQemuSerial("\u001B[B")
-                "HOME" -> sendQemuSerial("\u001B[H")
-                "END" -> sendQemuSerial("\u001B[F")
-                "Ctrl+C" -> sendQemuSerial("\u0003")
-                "CTRL", "ALT" -> Toast.makeText(this, "Use Ctrl+C to interrupt the running command.", Toast.LENGTH_SHORT).show()
-                else -> insertText(key)
-            }
-            input.requestFocus()
-            return
-        }
-        when (key) {
             "ESC" -> Unit
             "TAB" -> insertText("    ")
-            "CTRL" -> Toast.makeText(this, "Choose a Ctrl shortcut such as Ctrl+C.", Toast.LENGTH_SHORT).show()
+            "CTRL" -> Toast.makeText(this, "Commands run individually; Ctrl+C is not available yet.", Toast.LENGTH_SHORT).show()
             "ALT" -> Unit
             "←" -> moveCursor(-1)
             "→" -> moveCursor(1)
@@ -810,10 +794,7 @@ class MainActivity : Activity() {
             }
             "HOME" -> input.setSelection(0)
             "END" -> input.setSelection(input.text.length)
-            "Ctrl+C" -> {
-                input.text.clear()
-                appendLine("^C")
-            }
+            "Ctrl+C" -> { input.text.clear(); appendLine("^C") }
             else -> insertText(key)
         }
         input.requestFocus()
