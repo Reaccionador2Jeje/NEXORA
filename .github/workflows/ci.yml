@@ -101,10 +101,15 @@ jobs:
 
       - name: Verify legacy Waf runtime
         shell: bash -el {0}
-        run: python --version && python -c "import imp; print('Python 2 legacy Waf runtime available')"
+        run: |
+          python --version
+          python -c "import imp; print('Python 2 legacy Waf runtime available')"
+          command -v python
+          command -v python3 || true
+          python3 --version || true
 
       - name: Build standalone PRoot for Android ARM64
-        shell: bash
+        shell: bash -el {0}
         run: |
           set -euo pipefail
           SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
