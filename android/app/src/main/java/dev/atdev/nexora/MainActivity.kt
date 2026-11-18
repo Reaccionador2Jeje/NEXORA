@@ -33,7 +33,7 @@ import java.util.Locale
 
 /**
  * NEXORA Android terminal frontend.
- * The Android terminal runs Ubuntu 24.04 ARM64 as a persistent QEMU virtual machine.
+ * The Android terminal runs Ubuntu 24.04 ARM64 through PRoot.
  */
 class MainActivity : Activity() {
     private lateinit var output: TextView
@@ -409,7 +409,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(5), 0, dp(3))
         })
         hero.addView(TextView(this).apply {
-            text = "A standalone Ubuntu ARM64 virtual machine powered by QEMU."
+            text = "A rootless Ubuntu ARM64 environment powered by PRoot."
             textSize = 11f
             setTextColor(0xFFB6C8E2.toInt())
         })
@@ -460,7 +460,7 @@ class MainActivity : Activity() {
         panel.addView(storage, storageActionParams)
 
         val help = makeActionButton("⌨  COMMAND HELP", 0xFFBDEBFF.toInt(), 0xFF18334A.toInt(), false) {
-            appendLine("Commands: help, version, install-ubuntu, qemu-check, qemu-start, qemu-stop, ubuntu-status, clear, exit")
+            appendLine("Commands: help, version, install-ubuntu, ubuntu-status, pwd, ls, cd, clear, exit")
             decor.removeView(overlay)
         }
         val helpParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
@@ -623,7 +623,7 @@ class MainActivity : Activity() {
         val filter = IntentFilter().apply {
             addAction(TerminalExecutionService.ACTION_OUTPUT)
             addAction(TerminalExecutionService.ACTION_FINISHED)
-            addAction(TerminalExecutionService.ACTION_QEMU_INSTALL_FINISHED)
+            addAction(TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED)
             addAction(TerminalExecutionService.ACTION_QEMU_VM_STARTED)
             addAction(TerminalExecutionService.ACTION_QEMU_VM_STOPPED)
             addAction(TerminalExecutionService.ACTION_QEMU_SERIAL_OUTPUT)
@@ -672,8 +672,8 @@ class MainActivity : Activity() {
         panel.addView(hostField)
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Configure Ubuntu VM")
-            .setMessage("Choose the Linux username and hostname for your QEMU-powered Ubuntu environment.")
+            .setTitle("Configure Ubuntu")
+            .setMessage("Choose the Linux username and hostname for your Ubuntu environment.")
             .setView(panel)
             .setCancelable(false)
             .setPositiveButton("Create profile", null)
@@ -713,8 +713,8 @@ class MainActivity : Activity() {
         appendLine("Home: /home/$username")
         appendLine("Your Terminal. Your Universe.")
         appendLine("")
-        appendLine("QEMU Ubuntu ARM64: ${if (ubuntuRuntime.isInstalled()) "READY" else "NOT INSTALLED"}")
-        appendLine("Run install-ubuntu to prepare the VM, then qemu-start to boot it.")
+        appendLine("PRoot Ubuntu ARM64: ${if (ubuntuRuntime.isInstalled()) "READY" else "NOT INSTALLED"}")
+        appendLine("Run install-ubuntu once, then enter Linux commands directly.")
         appendLine("Type 'help' to see available commands.")
         promptLabel.text = prompt
         updateRuntimeStatus()
@@ -734,51 +734,45 @@ class MainActivity : Activity() {
         historyIndex = commandHistory.size
         appendLine("$prompt$line")
 
-        val parts = line.split(Regex("\\s+"), limit = 2)
-        val command = parts[0].lowercase(Locale.ROOT)
-        val argument = parts.getOrNull(1).orEmpty()
-
-        when (command) {
-            "help" -> {
-                appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, qemu-check, qemu-install, qemu-start, qemu-stop, qemu-status, exit")
-                appendLine("Ubuntu shell commands are available after qemu-start boots the VM.")
-            }
-            "version" -> appendLine("NEXORA Android 0.3.0")
+        val parts = line.split(Regex("\\\\s+"), limit = 2)
+        when (parts[0].lowercase(Locale.ROOT)) {
+            "help" -> appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, pwd, ls, cd, exit")
+            "version" -> appendLine("NEXORA Android 0.5.0 (PRoot)")
             "clear", "cls" -> output.text = ""
-            "install-ubuntu", "qemu-install" -> installUbuntuRuntime()
+            "install-ubuntu" -> installUbuntuRuntime()
             "ubuntu-status" -> appendLine(
-                if (ubuntuRuntime.isInstalled()) "QEMU Ubuntu ARM64 VM: prepared"
-                else "QEMU Ubuntu ARM64 VM: not installed"
+                if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 ARM64 through PRoot: ready"
+                else "Ubuntu 24.04 ARM64 through PRoot: not installed"
             )
-            "qemu-check" -> checkQemuRuntime()
-            "qemu-start" -> startQemuVm()
-            "qemu-stop" -> stopQemuVm()
-            "qemu-status" -> {
-                val diskReady = File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile
-                val seedReady = File(filesDir, "qemu/vm/cidata.img").isFile
-                val qemuExecutable = File(applicationInfo.nativeLibraryDir, "libqemu-system-aarch64.so")
-                val qemuReady = qemuExecutable.isFile && qemuExecutable.canExecute()
-                val firmwareReady = File(filesDir, "qemu/firmware/aavmf/AAVMF_CODE.fd").isFile
-                appendLine("QEMU VM: ${if (qemuVmActive) "RUNNING" else "STOPPED"}")
-                appendLine("QEMU Android binary: ${if (qemuReady) "installed" else "missing"}")
-                appendLine("ARM64 UEFI firmware: ${if (firmwareReady) "installed" else "missing"}")
-                appendLine("Ubuntu ARM64 disk: ${if (diskReady) "prepared" else "not installed"}")
-                appendLine("NoCloud first-boot seed: ${if (seedReady) "prepared" else "missing"}")
-            }
-            "exit", "logout" -> if (qemuVmActive) stopQemuVm()
-                else appendLine("QEMU Ubuntu VM is stopped.")
+            "exit", "logout" -> appendLine("Each command runs in its own Ubuntu process. No persistent shell is active.")
             else -> {
-                if (qemuVmActive) {
-                    sendQemuInput(line)
-                } else if (!ubuntuRuntime.isInstalled()) {
-                    appendLine("Ubuntu ARM64 is not installed. Run install-ubuntu, then qemu-start.")
+                if (!ubuntuRuntime.isInstalled()) {
+                    appendLine("Ubuntu is not installed. Run install-ubuntu first.")
                 } else {
-                    appendLine("Ubuntu is installed, but its QEMU virtual machine is stopped. Run qemu-start before entering Linux commands.")
+                    runUbuntuCommand(line)
                 }
             }
         }
         promptLabel.text = prompt
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun runUbuntuCommand(command: String) {
+        input.isEnabled = false
+        val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
+            action = TerminalExecutionService.ACTION_EXECUTE_COMMAND
+            putExtra(TerminalExecutionService.EXTRA_COMMAND, command)
+            putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
+            putExtra(TerminalExecutionService.EXTRA_UID, ubuntuUid)
+            putExtra(TerminalExecutionService.EXTRA_TREE_URI, preferences.getString("android_tree_uri", null))
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
+            else startService(serviceIntent)
+        } catch (error: Exception) {
+            input.isEnabled = true
+            appendLine("Could not start Ubuntu command: ${error.message}")
+        }
     }
 
     private fun startQemuVm() {
@@ -860,14 +854,14 @@ class MainActivity : Activity() {
 
     private fun installUbuntuRuntime() {
         if (ubuntuRuntime.isInstalled()) {
-            appendLine("QEMU Ubuntu VM is already prepared. Run qemu-start.")
+            appendLine("Ubuntu through PRoot is already prepared.")
             return
         }
-        appendLine("Starting QEMU installation and Ubuntu 24.04 ARM64 preparation…")
-        appendLine("The first setup downloads the official Ubuntu cloud image; keep enough free storage.")
+        appendLine("Starting PRoot installation and Ubuntu 24.04 ARM64 preparation…")
+        appendLine("The first setup downloads Ubuntu Base; keep at least 700 MB free.")
         input.isEnabled = false
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_PREPARE_QEMU_UBUNTU
+            action = TerminalExecutionService.ACTION_PREPARE_PROOT_UBUNTU
             putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
             putExtra(TerminalExecutionService.EXTRA_HOSTNAME, hostname)
         }
@@ -876,7 +870,7 @@ class MainActivity : Activity() {
             else startService(serviceIntent)
         } catch (error: Exception) {
             input.isEnabled = true
-            appendLine("Could not start QEMU installer: ${error.message}")
+            appendLine("Could not start PRoot installer: ${error.message}")
         }
     }
 
