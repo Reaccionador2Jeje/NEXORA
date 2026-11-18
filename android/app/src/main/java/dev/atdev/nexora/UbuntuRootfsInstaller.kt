@@ -36,8 +36,18 @@ class UbuntuRootfsInstaller(context: Context) {
             check(File(staging, "usr/bin/bash").isFile) { "Ubuntu archive is missing /usr/bin/bash." }
             check(File(staging, "etc/os-release").isFile) { "Ubuntu archive is missing /etc/os-release." }
             configureRootfs(staging)
-            rootfs.deleteRecursively()
-            check(staging.renameTo(rootfs)) { "Could not activate the extracted Ubuntu rootfs." }
+            val backup = File(installDir, "ubuntu.previous")
+            backup.deleteRecursively()
+            if (rootfs.exists()) {
+                check(rootfs.renameTo(backup)) { "Could not preserve the previous Ubuntu rootfs." }
+            }
+            if (!staging.renameTo(rootfs)) {
+                if (backup.exists()) backup.renameTo(rootfs)
+                error("Could not activate the extracted Ubuntu rootfs.")
+            }
+            backup.deleteRecursively()
+            File(rootfs, "root").mkdirs()
+            File(rootfs, "mnt/android").mkdirs()
             marker.writeText(expected)
             progress("Ubuntu Base 24.04 ARM64 installed and SHA-256 verified.")
         } catch (error: Exception) {
