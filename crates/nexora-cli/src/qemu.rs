@@ -384,10 +384,8 @@ mod tests {
 
     #[test]
     fn extracts_ubuntu_image_checksum_from_manifest() {
-        let path = std::env::temp_dir().join(format!(
-            "nexora-sha256-manifest-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("nexora-sha256-manifest-{}.txt", std::process::id()));
         let expected = "a".repeat(64);
         fs::write(
             &path,
@@ -401,10 +399,8 @@ mod tests {
 
     #[test]
     fn rejects_manifest_without_ubuntu_image_checksum() {
-        let path = std::env::temp_dir().join(format!(
-            "nexora-sha256-invalid-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("nexora-sha256-invalid-{}.txt", std::process::id()));
         fs::write(&path, format!("{}  another.img\n", "b".repeat(64))).unwrap();
 
         assert!(expected_sha256(&path).is_err());
@@ -413,10 +409,8 @@ mod tests {
 
     #[test]
     fn verifies_sha256_on_the_current_host() {
-        let path = std::env::temp_dir().join(format!(
-            "nexora-sha256-content-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("nexora-sha256-content-{}.txt", std::process::id()));
         fs::write(&path, b"abc").unwrap();
 
         let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
