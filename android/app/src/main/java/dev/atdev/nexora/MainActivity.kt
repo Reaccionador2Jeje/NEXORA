@@ -51,6 +51,8 @@ class MainActivity : Activity() {
     private var ubuntuUid = 10000
     private var terminalReceiverRegistered = false
     private var commandRunning = false
+    private var ctrlModifierArmed = false
+    private var altModifierArmed = false
 
     private val terminalReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -63,6 +65,8 @@ class MainActivity : Activity() {
                     val code = intent.getIntExtra(TerminalExecutionService.EXTRA_EXIT_CODE, 1)
                     appendLine("[process exited with code $code]")
                     commandRunning = false
+                    ctrlModifierArmed = false
+                    altModifierArmed = false
                     input.isEnabled = true
                     input.hint = "Command…"
                     promptLabel.text = prompt
@@ -712,7 +716,17 @@ class MainActivity : Activity() {
         val rawLine = input.text.toString()
         input.text.clear()
         if (commandRunning) {
-            sendTerminalInput(rawLine)
+            when {
+                ctrlModifierArmed && rawLine.isNotEmpty() -> {
+                    val key = rawLine.first().uppercaseChar()
+                    if (key in 'A'..'Z') sendTerminalInput((key.code - 64).toChar().toString(), appendNewline = false)
+                    else sendTerminalInput(rawLine)
+                }
+                altModifierArmed && rawLine.isNotEmpty() -> sendTerminalInput("\u001B$rawLine")
+                else -> sendTerminalInput(rawLine)
+            }
+            ctrlModifierArmed = false
+            altModifierArmed = false
             return
         }
         val line = rawLine.trim()
@@ -769,10 +783,11 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun sendTerminalInput(value: String) {
+    private fun sendTerminalInput(value: String, appendNewline: Boolean = true) {
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
             action = TerminalExecutionService.ACTION_SEND_INPUT
             putExtra(TerminalExecutionService.EXTRA_INPUT, value)
+            putExtra(TerminalExecutionService.EXTRA_INPUT_APPEND_NEWLINE, appendNewline)
         }
         try {
             startService(serviceIntent)
@@ -806,28 +821,36 @@ class MainActivity : Activity() {
 
     private fun handleShortcut(key: String) {
         when (key) {
-            "ESC" -> Unit
-            "TAB" -> insertText("    ")
-            "CTRL" -> Toast.makeText(this, "Use Ctrl+C to interrupt the running process.", Toast.LENGTH_SHORT).show()
-            "ALT" -> Unit
-            "←" -> moveCursor(-1)
-            "→" -> moveCursor(1)
-            "↑" -> {
+            "ESC" -> if (commandRunning) sendTerminalInput("\u001B", appendNewline = false) else insertText("\u001B")
+            "TAB" -> if (commandRunning) sendTerminalInput("\t", appendNewline = false) else insertText("    ")
+            "CTRL" -> {
+                ctrlModifierArmed = !ctrlModifierArmed
+                if (ctrlModifierArmed) altModifierArmed = false
+                Toast.makeText(this, if (ctrlModifierArmed) "Ctrl armed — enter a letter" else "Ctrl cancelled", Toast.LENGTH_SHORT).show()
+            }
+            "ALT" -> {
+                altModifierArmed = !altModifierArmed
+                if (altModifierArmed) ctrlModifierArmed = false
+                Toast.makeText(this, if (altModifierArmed) "Alt armed — enter a key" else "Alt cancelled", Toast.LENGTH_SHORT).show()
+            }
+            "←" -> if (commandRunning) sendTerminalInput("\u001B[D", false) else moveCursor(-1)
+            "→" -> if (commandRunning) sendTerminalInput("\u001B[C", false) else moveCursor(1)
+            "↑" -> if (commandRunning) sendTerminalInput("\u001B[A", false) else {
                 if (commandHistory.isNotEmpty()) {
                     historyIndex = (historyIndex - 1).coerceAtLeast(0)
                     input.setText(commandHistory[historyIndex])
                     input.setSelection(input.text.length)
                 }
             }
-            "↓" -> {
+            "↓" -> if (commandRunning) sendTerminalInput("\u001B[B", false) else {
                 historyIndex = (historyIndex + 1).coerceAtMost(commandHistory.size)
                 input.setText(commandHistory.getOrNull(historyIndex).orEmpty())
                 input.setSelection(input.text.length)
             }
-            "HOME" -> input.setSelection(0)
-            "END" -> input.setSelection(input.text.length)
+            "HOME" -> if (commandRunning) sendTerminalInput("\u001B[H", false) else input.setSelection(0)
+            "END" -> if (commandRunning) sendTerminalInput("\u001B[F", false) else input.setSelection(input.text.length)
             "Ctrl+C" -> {
-                if (commandRunning) sendTerminalInput("\u0003")
+                if (commandRunning) sendTerminalInput("\u0003", appendNewline = false)
                 else { input.text.clear(); appendLine("^C") }
             }
             else -> insertText(key)
