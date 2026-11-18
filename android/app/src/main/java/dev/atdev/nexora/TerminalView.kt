@@ -35,10 +35,10 @@ internal class TerminalView @JvmOverloads constructor(
     private val sequence = StringBuilder()
     private val terminalPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val palette = intArrayOf(
-        0xFF101820.toInt(), 0xFFCC6666.toInt(), 0xFFB5BD68.toInt(), 0xFFF0C674.toInt(),
-        0xFF81A2BE.toInt(), 0xFFB294BB.toInt(), 0xFF8ABEB7.toInt(), 0xFFC5C8C6.toInt(),
-        0xFF666666.toInt(), 0xFFD54E53.toInt(), 0xFFB9CA4A.toInt(), 0xFFE7C547.toInt(),
-        0xFF7AA6DA.toInt(), 0xFFC397D8.toInt(), 0xFF70C0B1.toInt(), 0xFFEAEAEA.toInt()
+        0xFF0B1413.toInt(), 0xFFE87979.toInt(), 0xFFB7F36B.toInt(), 0xFFE8C66A.toInt(),
+        0xFF72C7E8.toInt(), 0xFFC49BDF.toInt(), 0xFF65D6B5.toInt(), 0xFFDCEFE4.toInt(),
+        0xFF52665D.toInt(), 0xFFFF9292.toInt(), 0xFFC9FF83.toInt(), 0xFFFFDA85.toInt(),
+        0xFF8AD9F5.toInt(), 0xFFD7B3F0.toInt(), 0xFF86E8CA.toInt(), 0xFFF4FFF7.toInt()
     )
     private var cellWidth = 0f
     private var lineHeight = 0f
@@ -48,8 +48,8 @@ internal class TerminalView @JvmOverloads constructor(
         setWillNotDraw(false)
         setPadding(dp(7), dp(6), dp(7), dp(8))
         terminalPaint.typeface = Typeface.MONOSPACE
-        terminalPaint.textSize = 12.5f * resources.displayMetrics.scaledDensity
-        terminalPaint.color = 0xFFDCE7F5.toInt()
+        terminalPaint.textSize = 13f * resources.displayMetrics.scaledDensity
+        terminalPaint.color = 0xFFDCEFE4.toInt()
         cellWidth = terminalPaint.measureText("M")
         val fm = terminalPaint.fontMetrics
         lineHeight = fm.descent - fm.ascent + dp(3)
@@ -251,7 +251,7 @@ internal class TerminalView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(0xFF0D1523.toInt())
+        canvas.drawColor(0xFF0B1413.toInt())
         val fm = terminalPaint.fontMetrics
         val base = paddingTop - fm.ascent
         for (r in 0 until rows) {
@@ -271,10 +271,12 @@ internal class TerminalView @JvmOverloads constructor(
                 }
             }
         }
-        if (cursorVisible && isFocused) {
-            terminalPaint.color = 0xFFB9E6FF.toInt()
-            canvas.drawRect(paddingLeft + x * cellWidth, paddingTop + y * lineHeight,
-                paddingLeft + (x + 1) * cellWidth, paddingTop + (y + 1) * lineHeight, terminalPaint)
+        // A slim lime underline keeps the VT cursor visible without covering the glyph.
+        if (cursorVisible) {
+            terminalPaint.color = 0xFFB7F36B.toInt()
+            val left = paddingLeft + x * cellWidth
+            val top = paddingTop + (y + 1) * lineHeight - dp(2)
+            canvas.drawRect(left, top, left + cellWidth, top + dp(2), terminalPaint)
         }
     }
 
