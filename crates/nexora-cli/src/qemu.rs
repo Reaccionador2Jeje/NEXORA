@@ -301,7 +301,11 @@ fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
     #[cfg(windows)]
     let actual = String::from_utf8_lossy(&output.stdout)
         .lines()
-        .map(|line| line.chars().filter(|character| !character.is_whitespace()).collect::<String>())
+        .map(|line| {
+            line.chars()
+                .filter(|character| !character.is_whitespace())
+                .collect::<String>()
+        })
         .find(|line| line.len() == 64 && line.bytes().all(|byte| byte.is_ascii_hexdigit()))
         .map(|hash| hash.to_ascii_lowercase())
         .ok_or_else(|| "Could not parse certutil SHA-256 output".to_string())?;
