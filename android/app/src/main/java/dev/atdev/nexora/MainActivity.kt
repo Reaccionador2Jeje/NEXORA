@@ -26,6 +26,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import org.json.JSONArray
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,6 +45,7 @@ class MainActivity : Activity() {
     private lateinit var folderStatus: TextView
     private lateinit var workingDirectory: File
     private val commandHistory = mutableListOf<String>()
+    private val maxTerminalOutputChars = 250_000
     private var historyIndex = 0
     private var username = "user"
     private var hostname = "nexora"
@@ -98,6 +100,7 @@ class MainActivity : Activity() {
         ubuntuUid = preferences.getInt("ubuntu_uid", 10000)
         username = preferences.getString("ubuntu_username", "user") ?: "user"
         hostname = preferences.getString("ubuntu_hostname", "nexora") ?: "nexora"
+        restoreCommandHistory()
         workingDirectory = preferences.getString("working_directory", filesDir.absolutePath)
             ?.let(::File)
             ?.takeIf { isInsideWorkspace(it) && it.isDirectory }
@@ -738,6 +741,7 @@ class MainActivity : Activity() {
         if (line.isEmpty()) return
         commandHistory.add(line)
         if (commandHistory.size > 300) commandHistory.removeAt(0)
+        persistCommandHistory()
         historyIndex = commandHistory.size
         appendLine("$prompt$line")
 
@@ -917,12 +921,45 @@ class MainActivity : Activity() {
         false
     }
 
+    private fun restoreCommandHistory() {
+        commandHistory.clear()
+        val saved = preferences.getString("command_history", null) ?: return
+        try {
+            val entries = JSONArray(saved)
+            for (index in 0 until entries.length()) {
+                val entry = entries.optString(index)
+                if (entry.isNotBlank()) commandHistory.add(entry)
+            }
+            if (commandHistory.size > 300) {
+                commandHistory.subList(0, commandHistory.size - 300).clear()
+            }
+            historyIndex = commandHistory.size
+        } catch (_: Exception) {
+            // Ignore a damaged history preference instead of preventing startup.
+            commandHistory.clear()
+            preferences.edit().remove("command_history").apply()
+        }
+    }
+
+    private fun persistCommandHistory() {
+        val entries = JSONArray()
+        commandHistory.forEach(entries::put)
+        preferences.edit().putString("command_history", entries.toString()).apply()
+    }
+
     private fun appendLine(value: String) {
         appendText("$value\n")
     }
 
     private fun appendText(value: String) {
         output.append(value)
+        val current = output.text
+        if (current.length > maxTerminalOutputChars) {
+            val overflow = current.length - maxTerminalOutputChars
+            val nextLine = current.indexOf('\n', overflow)
+            val trimTo = if (nextLine >= 0) nextLine + 1 else overflow
+            output.text = current.subSequence(trimTo, current.length)
+        }
         output.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
