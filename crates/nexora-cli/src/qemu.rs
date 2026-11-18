@@ -286,9 +286,9 @@ fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            "(Get-FileHash -Algorithm SHA256 -LiteralPath $args[0]).Hash",
+            "(Get-FileHash -Algorithm SHA256 -LiteralPath $env:NEXORA_SHA256_FILE).Hash",
         ])
-        .arg(file)
+        .env("NEXORA_SHA256_FILE", file)
         .output();
     #[cfg(not(windows))]
     let output = Command::new("sha256sum").arg(file).output();
@@ -414,7 +414,7 @@ mod tests {
         fs::write(&path, b"abc").unwrap();
 
         let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-        assert!(super::verify_sha256(&path, expected).is_ok());
+        super::verify_sha256(&path, expected).unwrap_or_else(|error| panic!("SHA-256 verification failed: {error}"));
         fs::remove_file(path).unwrap();
     }
 }
