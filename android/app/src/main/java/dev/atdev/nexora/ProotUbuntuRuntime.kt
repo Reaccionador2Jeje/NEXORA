@@ -15,11 +15,12 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val rootfs = File(app.filesDir, "proot/ubuntu")
     private val proot = File(app.applicationInfo.nativeLibraryDir, "libproot.so")
     private val loader = File(app.applicationInfo.nativeLibraryDir, "libproot-loader.so")
+    private val installMarker = File(app.filesDir, "proot/ubuntu-base.sha256")
 
     override fun isInstalled(): Boolean =
         proot.isFile && proot.canRead() && proot.canExecute() && loader.isFile &&
             File(rootfs, "usr/bin/bash").isFile &&
-            File(rootfs, "etc/os-release").isFile
+            File(rootfs, "etc/os-release").isFile && installMarker.isFile
 
     override fun install(
         user: String,
@@ -35,8 +36,12 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                 val version = ProcessBuilder(proot.absolutePath, "--version")
                     .redirectErrorStream(true)
                     .start()
+                if (!version.waitFor(10, TimeUnit.SECONDS)) {
+                    version.destroyForcibly()
+                    error("The packaged PRoot executable did not respond to --version.")
+                }
                 val versionText = version.inputStream.bufferedReader().use { it.readText() }.trim()
-                check(version.waitFor(10, TimeUnit.SECONDS) && version.exitValue() == 0) {
+                check(version.exitValue() == 0) {
                     "The packaged PRoot executable failed its startup check: $versionText"
                 }
                 progress("PRoot runtime verified: $versionText")
