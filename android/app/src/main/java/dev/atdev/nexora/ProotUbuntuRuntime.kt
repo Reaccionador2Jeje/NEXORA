@@ -18,7 +18,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val installMarker = File(app.filesDir, "proot/ubuntu-base.sha256")
 
     override fun isInstalled(): Boolean =
-        proot.isFile && proot.canRead() && proot.canExecute() && loader.isFile &&
+        proot.isFile && proot.canRead() && proot.canExecute() && loader.isFile && loader.canExecute() &&
             File(rootfs, "usr/bin/bash").isFile &&
             File(rootfs, "etc/os-release").isFile && installMarker.isFile
 
@@ -30,7 +30,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     ) {
         Thread({
             try {
-                check(proot.isFile && proot.canExecute() && loader.isFile) {
+                check(proot.isFile && proot.canExecute() && loader.isFile && loader.canExecute()) {
                     "This APK does not include the ARM64 PRoot runtime. Install the APK produced by NEXORA Android CI."
                 }
                 val version = ProcessBuilder(proot.absolutePath, "--version")
