@@ -709,7 +709,7 @@ class MainActivity : Activity() {
         historyIndex = commandHistory.size
         appendLine("$prompt$line")
 
-        val parts = line.split(Regex("\\\\s+"), limit = 2)
+        val parts = line.split(Regex("\\s+"), limit = 2)
         when (parts[0].lowercase(Locale.ROOT)) {
             "help" -> appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, pwd, ls, cd, exit")
             "version" -> appendLine("NEXORA Android 0.5.0 (PRoot)")
