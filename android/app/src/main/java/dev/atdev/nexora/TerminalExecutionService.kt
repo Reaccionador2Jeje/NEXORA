@@ -26,7 +26,8 @@ class TerminalExecutionService : Service() {
             val value = intent.getStringExtra(EXTRA_INPUT).orEmpty()
             val writer = activeInput
             if (writer != null) {
-                writer(value + "\n")
+                val appendNewline = intent.getBooleanExtra(EXTRA_INPUT_APPEND_NEWLINE, true)
+                writer(if (appendNewline) value + "\n" else value)
             } else {
                 sendOutput("nex: no running process is accepting input.")
             }
@@ -190,6 +191,7 @@ class TerminalExecutionService : Service() {
         const val ACTION_SEND_INPUT = "dev.atdev.nexora.SEND_TERMINAL_INPUT"
         const val EXTRA_COMMAND = "command"
         const val EXTRA_INPUT = "terminal_input"
+        const val EXTRA_INPUT_APPEND_NEWLINE = "terminal_input_append_newline"
         const val EXTRA_USERNAME = "username"
         const val EXTRA_HOSTNAME = "hostname"
         const val EXTRA_UID = "uid"
