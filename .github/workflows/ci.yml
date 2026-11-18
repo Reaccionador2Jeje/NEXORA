@@ -87,7 +87,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools, ndk;23.2.8568313
+          packages: |
+            platform-tools
+            ndk;23.2.8568313
 
       - name: Build standalone PRoot for Android ARM64
         shell: bash
