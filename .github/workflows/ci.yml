@@ -30,8 +30,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
@@ -114,7 +112,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Verify Android VM provisioning unit tests
+      - name: Run Android unit tests
         working-directory: android
         run: gradle testDebugUnitTest
 
