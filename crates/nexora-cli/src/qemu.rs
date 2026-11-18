@@ -280,15 +280,13 @@ fn expected_sha256(checksums: &Path) -> Result<String, String> {
 }
 
 fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
+    // Use certutil on Windows: Get-FileHash is not guaranteed to be
+    // available in the PowerShell environment used by all Windows runners.
     #[cfg(windows)]
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "(Get-FileHash -Algorithm SHA256 -LiteralPath $env:NEXORA_SHA256_FILE).Hash",
-        ])
-        .env("NEXORA_SHA256_FILE", file)
+    let output = Command::new("certutil")
+        .arg("-hashfile")
+        .arg(file)
+        .arg("SHA256")
         .output();
     #[cfg(not(windows))]
     let output = Command::new("sha256sum").arg(file).output();
@@ -300,6 +298,14 @@ fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
+    #[cfg(windows)]
+    let actual = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| line.chars().filter(|character| !character.is_whitespace()).collect::<String>())
+        .find(|line| line.len() == 64 && line.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .map(|hash| hash.to_ascii_lowercase())
+        .ok_or_else(|| "Could not parse certutil SHA-256 output".to_string())?;
+    #[cfg(not(windows))]
     let actual = String::from_utf8_lossy(&output.stdout)
         .split_whitespace()
         .find(|part| part.len() == 64 && part.bytes().all(|byte| byte.is_ascii_hexdigit()))
