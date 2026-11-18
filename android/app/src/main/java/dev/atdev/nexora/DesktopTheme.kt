@@ -41,6 +41,26 @@ object DesktopTheme {
  <text x="90" y="1000" fill="#74729b" font-family="sans-serif" font-size="22" letter-spacing="4">NEXORA DESKTOP / XFCE</text>
 </svg>
 NEXORA_WALLPAPER
+cat > "\$HOME/.themes/NEXORA/index.theme" <<'NEXORA_INDEX'
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=NEXORA
+Comment=NEXORA dark neon desktop theme
+Encoding=UTF-8
+[X-GNOME-Metatheme]
+GtkTheme=NEXORA
+IconTheme=Papirus-Dark
+NEXORA_INDEX
+mkdir -p "\$HOME/.themes/NEXORA/xfwm4" && cat > "\$HOME/.themes/NEXORA/xfwm4/themerc" <<'NEXORA_XFWM'
+active_color=#211b42
+inactive_color=#11111f
+active_text_color=#ffffff
+inactive_text_color=#aaa6c8
+title_shadow_active=false
+title_shadow_inactive=false
+button_offset=5
+button_spacing=5
+NEXORA_XFWM
 cat > "\$HOME/.themes/NEXORA/gtk-3.0/gtk.css" <<'NEXORA_GTK'
 @define-color theme_bg_color #10101d;
 @define-color theme_fg_color #ecebff;
