@@ -656,7 +656,7 @@ class MainActivity : Activity() {
                 setSingleLine(true)
             }
 
-        val userField = field("Prompt username (e.g. cris)")
+        val userField = field("Profile label (e.g. cris)")
         val hostField = field("Prompt hostname (e.g. nexora)")
         panel.addView(userField)
         panel.addView(hostField)
@@ -699,8 +699,9 @@ class MainActivity : Activity() {
     private fun printWelcome() {
         output.text = ""
         appendLine("NEXORA 0.3.0 — Android")
-        appendLine("Ubuntu profile: $username@$hostname")
-        appendLine("Home: /home/$username")
+        appendLine("Shell: root@$hostname")
+        appendLine("Profile label: $username")
+        appendLine("Home: /root")
         appendLine("Your Terminal. Your Universe.")
         appendLine("")
         appendLine("PRoot Ubuntu ARM64: ${if (ubuntuRuntime.isInstalled()) "READY" else "NOT INSTALLED"}")
