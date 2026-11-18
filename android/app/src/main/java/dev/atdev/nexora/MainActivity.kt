@@ -943,7 +943,7 @@ class MainActivity : Activity() {
 
     private fun persistCommandHistory() {
         val entries = JSONArray()
-        commandHistory.forEach(entries::put)
+        commandHistory.forEach { entries.put(it) }
         preferences.edit().putString("command_history", entries.toString()).apply()
     }
 
