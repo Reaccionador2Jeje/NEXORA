@@ -7,7 +7,7 @@ package dev.atdev.nexora
 object DesktopCommands {
     // Install XFCE and TigerVNC, then persist a secure localhost-only session config.
     const val INSTALL =
-        "export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools && mkdir -p \"\$HOME/.vnc\" && printf '%s\\n' '\$session = \"xfce\";' '\$localhost = \"yes\";' '\$geometry = \"1280x720\";' '\$depth = 24;' > \"\$HOME/.vnc/tigervnc.conf\" && printf '%s\\n' '#!/bin/sh' 'unset SESSION_MANAGER' 'unset DBUS_SESSION_BUS_ADDRESS' 'exec dbus-launch --exit-with-session startxfce4' > \"\$HOME/.vnc/xstartup\" && chmod 700 \"\$HOME/.vnc/xstartup\""
+        "export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y xfce4 xfce4-terminal dbus-x11 tigervnc-standalone-server tigervnc-tools && mkdir -p \"\$HOME/.vnc\" && printf '%s\\n' '\$session = \"xfce\";' '\$localhost = \"yes\";' '\$geometry = \"1280x720\";' '\$depth = 24;' > \"\$HOME/.vnc/tigervnc.conf\" && printf '%s\\n' '#!/bin/sh' 'unset SESSION_MANAGER' 'unset DBUS_SESSION_BUS_ADDRESS' 'exec dbus-launch --exit-with-session startxfce4' > \"\$HOME/.vnc/xstartup\" && chmod 700 \"\$HOME/.vnc/xstartup\" && tigervncpasswd"
 
     // TigerVNC prompts for the password; it is never stored in the app or source code.
     const val SET_PASSWORD = "tigervncpasswd"
