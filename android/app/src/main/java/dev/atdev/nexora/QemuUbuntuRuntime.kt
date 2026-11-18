@@ -15,12 +15,12 @@ class QemuUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
     private val vmDirectory = File(app.filesDir, "qemu/vm")
 
     override fun isInstalled(): Boolean {
-        val qemu = File(app.filesDir, "qemu/arm64-v8a/qemu-system-aarch64")
+        val qemu = File(app.applicationInfo.nativeLibraryDir, "libqemu-system-aarch64.so")
         val disk = File(vmDirectory, "ubuntu-24.04-arm64.qcow2")
         val seed = File(vmDirectory, "cidata.img")
         val firmware = File(app.filesDir, "qemu/firmware/aavmf/AAVMF_CODE.fd")
         val vars = File(vmDirectory, "AAVMF_VARS.fd")
-        return qemu.isFile && qemu.canExecute() &&
+        return qemu.isFile && qemu.canRead() && qemu.canExecute() &&
             disk.isFile && disk.length() > 100L * 1024L * 1024L &&
             seed.isFile && firmware.isFile && vars.isFile
     }
