@@ -3,7 +3,7 @@ package dev.atdev.nexora
 /**
  * Stateful ANSI stream cleanup for the scrolling console.
  *
- * It handles split escape sequences, ANSI styling, carriage-return progress
+ * Handles split escape sequences, ANSI styling, carriage-return progress
  * lines, backspace and erase-line controls. Full-screen TUIs need a grid-based
  * terminal emulator and are intentionally not flattened into this text buffer.
  */
@@ -55,7 +55,7 @@ internal class TerminalOutputBuffer(private val maxChars: Int) {
                     '\u0007' -> state = State.TEXT
                     '\u001B' -> state = State.OSC_ESCAPE
                 }
-                State.OSC_ESCAPE -> state = if (ch == '\\\\') State.TEXT else State.OSC
+                State.OSC_ESCAPE -> state = if (ch == '\\') State.TEXT else State.OSC
             }
         }
         trim()
@@ -68,7 +68,7 @@ internal class TerminalOutputBuffer(private val maxChars: Int) {
     }
 
     private fun lineStart(): Int {
-        val previousNewline = if (cursor > 0) text.lastIndexOf("\\n", (cursor - 1).coerceAtLeast(0)) else -1
+        val previousNewline = if (cursor > 0) text.lastIndexOf("\n", (cursor - 1).coerceAtLeast(0)) else -1
         return previousNewline + 1
     }
 
@@ -76,14 +76,14 @@ internal class TerminalOutputBuffer(private val maxChars: Int) {
         val mode = parameters.substringAfterLast(';').toIntOrNull() ?: 0
         val start = lineStart()
         when (mode) {
-            0 -> if (cursor < text.length) text.delete(cursor, text.indexOf("\\n", cursor).let { if (it < 0) text.length else it })
+            0 -> if (cursor < text.length) text.delete(cursor, text.indexOf("\n", cursor).let { if (it < 0) text.length else it })
             1 -> {
                 val end = cursor.coerceAtMost(text.length)
                 if (end > start) text.delete(start, end)
                 cursor = start
             }
             2 -> {
-                val end = text.indexOf("\\n", start).let { if (it < 0) text.length else it }
+                val end = text.indexOf("\n", start).let { if (it < 0) text.length else it }
                 text.delete(start, end)
                 cursor = start
             }
@@ -93,7 +93,7 @@ internal class TerminalOutputBuffer(private val maxChars: Int) {
     private fun trim() {
         if (text.length <= maxChars) return
         val overflow = text.length - maxChars
-        val newline = text.indexOf("\\n", overflow)
+        val newline = text.indexOf("\n", overflow)
         val remove = if (newline >= 0) newline + 1 else overflow
         text.delete(0, remove)
         cursor = (cursor - remove).coerceAtLeast(0)
