@@ -16,8 +16,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.text.Editable
 import android.text.TextWatcher
-import android.text.Spanned
-import android.text.BaseInputConnection
+import android.view.inputmethod.BaseInputConnection
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
