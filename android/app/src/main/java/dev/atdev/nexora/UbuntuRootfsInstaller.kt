@@ -35,6 +35,7 @@ class UbuntuRootfsInstaller(context: Context) {
             extractArchive(staging)
             check(File(staging, "usr/bin/bash").isFile) { "Ubuntu archive is missing /usr/bin/bash." }
             check(File(staging, "etc/os-release").isFile) { "Ubuntu archive is missing /etc/os-release." }
+            configureRootfs(staging)
             rootfs.deleteRecursively()
             check(staging.renameTo(rootfs)) { "Could not activate the extracted Ubuntu rootfs." }
             marker.writeText(expected)
@@ -105,6 +106,24 @@ class UbuntuRootfsInstaller(context: Context) {
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun configureRootfs(destination: File) {
+        val connectivity = app.getSystemService(android.net.ConnectivityManager::class.java)
+        val dnsServers = connectivity.activeNetwork
+            ?.let { connectivity.getLinkProperties(it)?.dnsServers }
+            ?.map { it.hostAddress }
+            ?.filterNotNull()
+            .orEmpty()
+            .ifEmpty { listOf("1.1.1.1", "8.8.8.8") }
+
+        val resolvConf = File(destination, "etc/resolv.conf")
+        if (java.nio.file.Files.isSymbolicLink(resolvConf.toPath()) || resolvConf.exists()) {
+            resolvConf.delete()
+        }
+        resolvConf.parentFile?.mkdirs()
+        resolvConf.writeText(dnsServers.joinToString("\\n") { "nameserver $it" } + "\\n")
+        File(destination, "etc/hostname").writeText("nexora\\n")
     }
 
     private fun extractArchive(destination: File) {
