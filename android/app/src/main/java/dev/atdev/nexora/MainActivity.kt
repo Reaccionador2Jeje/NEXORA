@@ -50,6 +50,7 @@ class MainActivity : Activity() {
     private lateinit var ubuntuRuntime: LinuxRuntimeEngine
     private var ubuntuUid = 10000
     private var terminalReceiverRegistered = false
+    private var commandRunning = false
 
     private val terminalReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -59,14 +60,18 @@ class MainActivity : Activity() {
                 TerminalExecutionService.ACTION_FINISHED -> {
                     val code = intent.getIntExtra(TerminalExecutionService.EXTRA_EXIT_CODE, 1)
                     appendLine("[process exited with code $code]")
+                    commandRunning = false
                     input.isEnabled = true
+                    input.hint = "Command…"
                     promptLabel.text = prompt
                     input.requestFocus()
                 }
                 TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED -> {
                     val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_INSTALL_SUCCESS, false)
                     val message = intent.getStringExtra(TerminalExecutionService.EXTRA_INSTALL_MESSAGE).orEmpty()
+                    commandRunning = false
                     input.isEnabled = true
+                    input.hint = "Command…"
                     appendLine(if (success) message else "PRoot Ubuntu preparation failed: $message")
                     updateRuntimeStatus()
                     promptLabel.text = prompt
@@ -701,8 +706,13 @@ class MainActivity : Activity() {
         if (workingDirectory == filesDir) "~" else "~/${workingDirectory.relativeTo(filesDir).path}"
 
     private fun submitCommand() {
-        val line = input.text.toString().trim()
+        val rawLine = input.text.toString()
         input.text.clear()
+        if (commandRunning) {
+            sendTerminalInput(rawLine)
+            return
+        }
+        val line = rawLine.trim()
         if (line.isEmpty()) return
         commandHistory.add(line)
         if (commandHistory.size > 300) commandHistory.removeAt(0)
@@ -733,7 +743,10 @@ class MainActivity : Activity() {
     }
 
     private fun runUbuntuCommand(command: String) {
-        input.isEnabled = false
+        commandRunning = true
+        input.isEnabled = true
+        input.hint = "Input to process…"
+        promptLabel.text = "stdin ›"
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
             action = TerminalExecutionService.ACTION_EXECUTE_COMMAND
             putExtra(TerminalExecutionService.EXTRA_COMMAND, command)
@@ -750,6 +763,18 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun sendTerminalInput(value: String) {
+        val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
+            action = TerminalExecutionService.ACTION_SEND_INPUT
+            putExtra(TerminalExecutionService.EXTRA_INPUT, value)
+        }
+        try {
+            startService(serviceIntent)
+        } catch (error: Exception) {
+            appendLine("Could not send terminal input: ${error.message}")
+        }
+    }
+
     private fun installUbuntuRuntime() {
         if (ubuntuRuntime.isInstalled()) {
             appendLine("Ubuntu through PRoot is already prepared.")
@@ -758,6 +783,7 @@ class MainActivity : Activity() {
         appendLine("Starting PRoot installation and Ubuntu 24.04 ARM64 preparation…")
         appendLine("The first setup downloads Ubuntu Base; keep at least 700 MB free.")
         input.isEnabled = false
+        input.hint = "Command…"
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
             action = TerminalExecutionService.ACTION_PREPARE_PROOT_UBUNTU
             putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
