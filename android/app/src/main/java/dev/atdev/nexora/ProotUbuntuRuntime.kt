@@ -27,7 +27,8 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
         if (!saved.startsWith("/")) return "/root"
         val guestPath = saved.removePrefix("/")
         val directory = File(rootfs, guestPath).canonicalFile
-        return if (directory.isDirectory && directory.path.startsWith(rootfs.canonicalPath + File.separator)) saved else "/root"
+        val rootPath = rootfs.canonicalPath
+        return if (directory.isDirectory && (directory.path == rootPath || directory.path.startsWith(rootPath + File.separator))) saved else "/root"
     }
 
     override fun isInstalled(): Boolean =
