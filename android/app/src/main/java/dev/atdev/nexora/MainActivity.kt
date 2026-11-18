@@ -37,7 +37,7 @@ import java.util.Locale
  * The Android terminal runs Ubuntu 24.04 ARM64 through PRoot.
  */
 class MainActivity : Activity() {
-    private lateinit var output: TextView
+    private lateinit var output: TerminalView
     private lateinit var input: EditText
     private lateinit var promptLabel: TextView
     private lateinit var scroll: ScrollView
@@ -272,11 +272,11 @@ class MainActivity : Activity() {
             setClipToPadding(false)
             setPadding(0, dp(2), 0, dp(3))
         }
-        output = TextView(this).apply {
+        output = TerminalView(this).apply {
             textSize = 12.5f
             typeface = Typeface.create("monospace", Typeface.NORMAL)
             setTextColor(0xFFDCE7F5.toInt())
-            setTextIsSelectable(true)
+            setTextIsSelectable(false)
             setLineSpacing(dp(3).toFloat(), 1f)
             setPadding(dp(7), dp(6), dp(7), dp(10))
         }
@@ -463,7 +463,7 @@ class MainActivity : Activity() {
         panel.addView(help, helpParams)
 
         val clear = makeActionButton("✦  CLEAR TERMINAL", 0xFFB8F7D4.toInt(), 0xFF17352F.toInt(), false) {
-            output.text = ""
+            output.clearTerminal()
             decor.removeView(overlay)
         }
         val clearParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
@@ -698,7 +698,7 @@ class MainActivity : Activity() {
 
     private fun printWelcome() {
         terminalOutput.clear()
-        output.text = ""
+        output.clearTerminal()
         appendLine("NEXORA 0.3.0 — Android")
         appendLine("Shell: root@$hostname")
         appendLine("Profile label: $username")
@@ -751,7 +751,7 @@ class MainActivity : Activity() {
         when (parts[0].lowercase(Locale.ROOT)) {
             "help" -> appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, pwd, ls, cd, exit")
             "version" -> appendLine("NEXORA Android 0.5.0 (PRoot)")
-            "clear", "cls" -> output.text = ""
+            "clear", "cls" -> { terminalOutput.clear(); output.clearTerminal() }
             "install-ubuntu" -> installUbuntuRuntime()
             "ubuntu-status" -> appendLine(
                 if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 ARM64 through PRoot: ready"
@@ -955,7 +955,7 @@ class MainActivity : Activity() {
     private val terminalOutput = TerminalOutputBuffer(maxTerminalOutputChars)
 
     private fun appendText(value: String) {
-        output.text = terminalOutput.append(value)
+        output.feed(value)
         output.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
