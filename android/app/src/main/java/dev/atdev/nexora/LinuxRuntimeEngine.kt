@@ -22,6 +22,7 @@ interface LinuxRuntimeEngine {
         uid: Int,
         androidShared: File? = null,
         line: (String) -> Unit,
+        onInputReady: (((String) -> Unit) -> Unit) = {},
         done: (Int) -> Unit
     )
 }
