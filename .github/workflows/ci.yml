@@ -15,7 +15,6 @@ permissions:
   actions: read
   contents: read
 
-
 jobs:
   validate:
     name: Validate and build on ${{ matrix.os }}
@@ -86,6 +85,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Install Android SDK packages
         run: sdkmanager "platform-tools" "ndk;23.2.8568313"
