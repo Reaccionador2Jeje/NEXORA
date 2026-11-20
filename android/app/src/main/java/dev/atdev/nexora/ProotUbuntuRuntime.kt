@@ -91,16 +91,11 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
             done(1)
             return
         }
-        val health = runtimeHealthProblem()
-        if (health != null) {
-            line("nex: Ubuntu runtime check failed: $health")
-            done(1)
-            return
-        }
-
         Thread({
             var exitCode = 1
             try {
+                val health = runtimeHealthProblem()
+                check(health == null) { health ?: "Unknown PRoot runtime error." }
                 prepareSessionDirectory()
                 val sessionCwd = currentWorkingDirectory()
                 val commandWithSession = command + "\n" +
