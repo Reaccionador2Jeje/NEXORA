@@ -91,6 +91,12 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
             done(1)
             return
         }
+        val health = runtimeHealthProblem()
+        if (health != null) {
+            line("nex: Ubuntu runtime check failed: $health")
+            done(1)
+            return
+        }
 
         Thread({
             var exitCode = 1
@@ -142,8 +148,10 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                         environment()["PROOT_TMP_DIR"] = prootTempDir.absolutePath
                         environment()["TMPDIR"] = prootTempDir.absolutePath
                         val metrics = app.resources.displayMetrics
-                        environment()["NEXORA_PTY_COLS"] = ((metrics.widthPixels / metrics.scaledDensity) / 7.5f).toInt().coerceIn(20, 240).toString()
-                        environment()["NEXORA_PTY_ROWS"] = "24"
+                        val widthDp = metrics.widthPixels / metrics.scaledDensity
+                        val heightDp = metrics.heightPixels / metrics.scaledDensity
+                        environment()["NEXORA_PTY_COLS"] = (widthDp / 7.5f).toInt().coerceIn(20, 240).toString()
+                        environment()["NEXORA_PTY_ROWS"] = (heightDp / 18f).toInt().coerceIn(8, 80).toString()
                     }
                     .start()
                 onInputReady { value ->
@@ -170,6 +178,23 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
             }
         }, "nexora-proot-command").start()
     }
+    /**
+     * Fast preflight checks catch damaged rootfs/session storage before starting PRoot.
+     * These are host-side checks; they do not claim to validate Ubuntu package health.
+     */
+    private fun runtimeHealthProblem(): String? = runCatching {
+        check(rootfs.isDirectory) { "Ubuntu rootfs directory is missing." }
+        check(File(rootfs, "usr/bin/bash").isFile) { "Ubuntu Bash is missing; run INSTALL / REPAIR UBUNTU." }
+        check(File(rootfs, "etc/os-release").isFile) { "Ubuntu release metadata is missing; repair the rootfs." }
+        check(proot.isFile && proot.canExecute()) { "PRoot executable is missing or not executable." }
+        check(loader.isFile && loader.canExecute()) { "PRoot loader is missing or not executable." }
+        check(ptyHelper.isFile && ptyHelper.canExecute()) { "NEXORA PTY helper is missing or not executable." }
+        check(rootfs.usableSpace >= 32L * 1024L * 1024L) {
+            "Less than 32 MB of free app storage remains; free space before running Ubuntu."
+        }
+        prepareProotTempDir()
+    }.exceptionOrNull()?.message
+
     /** Creates persistent host-side state shared with the Ubuntu rootfs. */
     private fun prepareSessionDirectory() {
         check(sessionDirectory.isDirectory || sessionDirectory.mkdirs()) {
