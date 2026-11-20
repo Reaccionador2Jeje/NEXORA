@@ -47,6 +47,7 @@ class MainActivity : Activity() {
     private lateinit var scroll: ScrollView
     private lateinit var runtimeStatus: TextView
     private lateinit var folderStatus: TextView
+    private lateinit var resourceSummary: TextView
     private lateinit var workingDirectory: File
     private val commandHistory = mutableListOf<String>()
     private val maxTerminalOutputChars = 250_000
@@ -220,6 +221,33 @@ class MainActivity : Activity() {
         val envParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         envParams.bottomMargin = dp(9)
         root.addView(environment, envParams)
+
+        // Host-device telemetry is deliberately labeled separately from Ubuntu.
+        val resourceCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(9), dp(12), dp(10))
+            background = roundedBackground(intArrayOf(0xFF101B18.toInt(), 0xFF0D1714.toInt()), 12)
+        }
+        resourceCard.addView(TextView(this).apply {
+            text = "DEVICE RESOURCES  /  ANDROID HOST"
+            textSize = 8f
+            letterSpacing = 0.12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF8CA99A.toInt())
+        })
+        resourceSummary = TextView(this).apply {
+            textSize = 10f
+            typeface = Typeface.create("monospace", Typeface.NORMAL)
+            setTextColor(0xFFD7E9DF.toInt())
+            setPadding(0, dp(5), 0, 0)
+            maxLines = 2
+        }
+        resourceCard.addView(resourceSummary)
+        val resourceParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        resourceParams.bottomMargin = dp(9)
+        root.addView(resourceCard, resourceParams)
 
         val terminalPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -415,6 +443,12 @@ class MainActivity : Activity() {
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         updateRuntimeStatus()
         updateFolderStatus()
+        updateHostResourceSummary()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::resourceSummary.isInitialized) updateHostResourceSummary()
     }
 
     /** Opens the secondary controls without shrinking the terminal workspace. */
@@ -1199,6 +1233,27 @@ class MainActivity : Activity() {
         val wasAtBottom = scroll.height + scroll.scrollY >= scroll.getChildAt(0).height - dp(48)
         output.feed(value)
         if (wasAtBottom) output.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    /**
+     * Shows Android host resources only. PRoot shares the host kernel and these
+     * figures are not measurements of an isolated Ubuntu guest.
+     */
+    private fun updateHostResourceSummary() {
+        if (!::resourceSummary.isInitialized) return
+        val memory = android.app.ActivityManager.MemoryInfo()
+        (getSystemService(ACTIVITY_SERVICE) as? android.app.ActivityManager)
+            ?.getMemoryInfo(memory)
+        val totalRamMb = memory.totalMem / (1024L * 1024L)
+        val availableRamMb = memory.availMem / (1024L * 1024L)
+        val storage = android.os.StatFs(filesDir.absolutePath)
+        val totalStorageMb = storage.totalBytes / (1024L * 1024L)
+        val freeStorageMb = storage.availableBytes / (1024L * 1024L)
+        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+        resourceSummary.text =
+            "RAM  \${availableRamMb} MB free / \${totalRamMb} MB   ·   " +
+            "APP STORAGE  \${freeStorageMb} MB free / \${totalStorageMb} MB\n" +
+            "CPU  \${Runtime.getRuntime().availableProcessors()} cores   ·   ABI  \$abi   ·   Android \${Build.VERSION.RELEASE}"
     }
 
     private fun dp(value: Int): Int =
