@@ -1251,9 +1251,9 @@ class MainActivity : Activity() {
         val freeStorageMb = storage.availableBytes / (1024L * 1024L)
         val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
         resourceSummary.text =
-            "RAM  \${availableRamMb} MB free / \${totalRamMb} MB   ·   " +
-            "APP STORAGE  \${freeStorageMb} MB free / \${totalStorageMb} MB\n" +
-            "CPU  \${Runtime.getRuntime().availableProcessors()} cores   ·   ABI  \$abi   ·   Android \${Build.VERSION.RELEASE}"
+            "RAM  $availableRamMb MB free / $totalRamMb MB   ·   " +
+            "APP STORAGE  $freeStorageMb MB free / $totalStorageMb MB\\n" +
+            "CPU  ${Runtime.getRuntime().availableProcessors()} cores   ·   ABI  $abi   ·   Android ${Build.VERSION.RELEASE}"
     }
 
     private fun dp(value: Int): Int =
