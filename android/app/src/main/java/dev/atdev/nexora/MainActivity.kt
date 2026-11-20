@@ -14,11 +14,15 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.inputmethod.BaseInputConnection
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
@@ -26,6 +30,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import org.json.JSONArray
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -33,63 +38,59 @@ import java.util.Locale
 
 /**
  * NEXORA Android terminal frontend.
- * The Android terminal runs Ubuntu 24.04 ARM64 as a persistent QEMU virtual machine.
+ * The Android terminal runs Ubuntu 24.04 ARM64 through PRoot.
  */
 class MainActivity : Activity() {
-    private lateinit var output: TextView
+    private lateinit var output: TerminalView
     private lateinit var input: EditText
     private lateinit var promptLabel: TextView
     private lateinit var scroll: ScrollView
     private lateinit var runtimeStatus: TextView
     private lateinit var folderStatus: TextView
+    private lateinit var resourceSummary: TextView
     private lateinit var workingDirectory: File
     private val commandHistory = mutableListOf<String>()
+    private val maxTerminalOutputChars = 250_000
     private var historyIndex = 0
     private var username = "user"
     private var hostname = "nexora"
     private lateinit var ubuntuRuntime: LinuxRuntimeEngine
     private var ubuntuUid = 10000
     private var terminalReceiverRegistered = false
-    private var qemuVmActive = false
+    private var commandRunning = false
+    private var desktopSessionRunning = false
+    private var ctrlModifierArmed = false
+    private var altModifierArmed = false
 
     private val terminalReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 TerminalExecutionService.ACTION_OUTPUT ->
                     appendLine(intent.getStringExtra(TerminalExecutionService.EXTRA_OUTPUT).orEmpty())
+                TerminalExecutionService.ACTION_OUTPUT_CHUNK ->
+                    appendText(intent.getStringExtra(TerminalExecutionService.EXTRA_OUTPUT).orEmpty())
                 TerminalExecutionService.ACTION_FINISHED -> {
                     val code = intent.getIntExtra(TerminalExecutionService.EXTRA_EXIT_CODE, 1)
                     appendLine("[process exited with code $code]")
+                    commandRunning = false
+                    desktopSessionRunning = false
+                    ctrlModifierArmed = false
+                    altModifierArmed = false
                     input.isEnabled = true
+                    input.hint = "Command…"
                     promptLabel.text = prompt
-                    input.requestFocus()
+                    keepKeyboardOpen()
                 }
-                TerminalExecutionService.ACTION_QEMU_INSTALL_FINISHED -> {
-                    val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_QEMU_INSTALL_SUCCESS, false)
-                    val message = intent.getStringExtra(TerminalExecutionService.EXTRA_QEMU_INSTALL_MESSAGE).orEmpty()
+                TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED -> {
+                    val success = intent.getBooleanExtra(TerminalExecutionService.EXTRA_INSTALL_SUCCESS, false)
+                    val message = intent.getStringExtra(TerminalExecutionService.EXTRA_INSTALL_MESSAGE).orEmpty()
+                    commandRunning = false
                     input.isEnabled = true
-                    appendLine(if (success) message else "QEMU Ubuntu preparation failed: $message")
-                    if (success) appendLine("Run qemu-start to boot the Ubuntu virtual machine.")
+                    input.hint = "Command…"
+                    appendLine(if (success) message else "PRoot Ubuntu preparation failed: $message")
                     updateRuntimeStatus()
                     promptLabel.text = prompt
-                    input.requestFocus()
-                }
-                TerminalExecutionService.ACTION_QEMU_SERIAL_OUTPUT ->
-                    appendText(intent.getStringExtra(TerminalExecutionService.EXTRA_QEMU_SERIAL_TEXT).orEmpty())
-                TerminalExecutionService.ACTION_QEMU_VM_STARTED -> {
-                    qemuVmActive = true
-                    input.isEnabled = true
-                    appendLine("QEMU VM process is active. Serial terminal input is connected.")
-                    promptLabel.text = prompt
-                    input.requestFocus()
-                }
-                TerminalExecutionService.ACTION_QEMU_VM_STOPPED -> {
-                    qemuVmActive = false
-                    input.isEnabled = true
-                    val code = intent.getIntExtra(TerminalExecutionService.EXTRA_QEMU_VM_EXIT, 0)
-                    appendLine("QEMU VM is stopped (exit $code).")
-                    promptLabel.text = prompt
-                    input.requestFocus()
+                    keepKeyboardOpen()
                 }
             }
         }
@@ -98,7 +99,7 @@ class MainActivity : Activity() {
     private val supabaseAuth by lazy { SupabaseAuth(this) }
     private val preferences by lazy { getSharedPreferences("nexora", MODE_PRIVATE) }
     private val prompt: String
-        get() = "$username@$hostname:${displayPath()}$ "
+        get() = "root@$hostname:${displayPath()}# "
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,6 +107,7 @@ class MainActivity : Activity() {
         ubuntuUid = preferences.getInt("ubuntu_uid", 10000)
         username = preferences.getString("ubuntu_username", "user") ?: "user"
         hostname = preferences.getString("ubuntu_hostname", "nexora") ?: "nexora"
+        restoreCommandHistory()
         workingDirectory = preferences.getString("working_directory", filesDir.absolutePath)
             ?.let(::File)
             ?.takeIf { isInsideWorkspace(it) && it.isDirectory }
@@ -129,65 +131,207 @@ class MainActivity : Activity() {
     }
 
     private fun buildInterface() {
-        // Main terminal workspace: compact controls at the top, console fills the rest.
-        val frame = FrameLayout(this).apply {
-            setBackgroundColor(0xFF080D19.toInt())
-        }
+        // NEXORA mobile workstation: terminal first, command dock anchored at the bottom.
+        val frame = FrameLayout(this).apply { setBackgroundColor(0xFF080F12.toInt()) }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(12), dp(7), dp(12), dp(10))
+            setPadding(dp(13), dp(8), dp(13), dp(9))
+            // Keep the command dock and terminal shortcut keys above Android's
+            // gesture/navigation bar, including Android 15 edge-to-edge mode.
+            setOnApplyWindowInsetsListener { view, insets ->
+                val navigationBottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    insets.getInsets(android.view.WindowInsets.Type.navigationBars()).bottom
+                } else {
+                    @Suppress("DEPRECATION")
+                    insets.systemWindowInsetBottom
+                }
+                view.setPadding(dp(13), dp(8), dp(13), dp(9) + navigationBottom)
+                insets
+            }
         }
 
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(2), dp(2), dp(2), dp(7))
+            setPadding(dp(1), dp(2), dp(1), dp(10))
         }
-        val menuButton = TextView(this).apply {
-            text = "☰"
-            textSize = 23f
+        header.addView(TextView(this).apply {
+            text = "N/"
+            textSize = 19f
+            typeface = Typeface.create("monospace", Typeface.BOLD)
             gravity = Gravity.CENTER
-            setTextColor(0xFFB8D8F5.toInt())
-            background = roundedBackground(intArrayOf(0xFF172338.toInt(), 0xFF172338.toInt()), 12)
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { openSideMenu() }
-        }
-        header.addView(menuButton, LinearLayout.LayoutParams(dp(42), dp(40)))
+            setTextColor(0xFF0B1710.toInt())
+            background = roundedBackground(intArrayOf(0xFFB7F36B.toInt(), 0xFF8EDB64.toInt()), 12)
+        }, LinearLayout.LayoutParams(dp(42), dp(42)))
         val brandColumn = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), 0, 0, 0)
         }
         brandColumn.addView(TextView(this).apply {
             text = "NEXORA"
-            textSize = 19f
-            letterSpacing = 0.08f
+            textSize = 18f
+            letterSpacing = 0.09f
             typeface = Typeface.create("sans-serif-black", Typeface.NORMAL)
-            setTextColor(0xFFEAF5FF.toInt())
+            setTextColor(0xFFF0F7F2.toInt())
         })
         brandColumn.addView(TextView(this).apply {
-            text = "YOUR TERMINAL. YOUR UNIVERSE."
+            text = "MOBILE LINUX WORKSPACE"
             textSize = 8f
-            letterSpacing = 0.12f
-            setTextColor(0xFF7186A8.toInt())
+            letterSpacing = 0.14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF7E9A8D.toInt())
         })
         header.addView(brandColumn, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(makePill("●  ANDROID", 0xFF86EFAC.toInt(), 0xFF102B28.toInt()))
+        header.addView(TextView(this).apply {
+            text = "☰"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFD7E9DF.toInt())
+            background = roundedBackground(intArrayOf(0xFF172622.toInt(), 0xFF172622.toInt()), 13)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Open workspace menu"
+            setOnClickListener { openSideMenu() }
+        }, LinearLayout.LayoutParams(dp(42), dp(42)))
         root.addView(header)
 
-        // Prompt stays directly below the app bar for fast command entry.
+        val environment = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            background = roundedBackground(intArrayOf(0xFF13211D.toInt(), 0xFF101B19.toInt()), 12)
+        }
+        val envText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        envText.addView(TextView(this).apply {
+            text = "UBUNTU 24.04 LTS"
+            textSize = 10f
+            letterSpacing = 0.08f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFE4F4E9.toInt())
+        })
+        envText.addView(TextView(this).apply {
+            text = "ARM64  /  PRoot  /  ROOT SESSION"
+            textSize = 8f
+            letterSpacing = 0.07f
+            setTextColor(0xFF7D9B8D.toInt())
+            setPadding(0, dp(3), 0, 0)
+        })
+        environment.addView(envText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        environment.addView(makePill("●  ANDROID", 0xFFB7F36B.toInt(), 0xFF20321F.toInt()))
+        val envParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        envParams.bottomMargin = dp(9)
+        root.addView(environment, envParams)
+
+        // Host-device telemetry is deliberately labeled separately from Ubuntu.
+        val resourceCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), dp(9), dp(12), dp(10))
+            background = roundedBackground(intArrayOf(0xFF101B18.toInt(), 0xFF0D1714.toInt()), 12)
+        }
+        resourceCard.addView(TextView(this).apply {
+            text = "DEVICE RESOURCES  /  ANDROID HOST"
+            textSize = 8f
+            letterSpacing = 0.12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF8CA99A.toInt())
+        })
+        resourceSummary = TextView(this).apply {
+            textSize = 10f
+            typeface = Typeface.create("monospace", Typeface.NORMAL)
+            setTextColor(0xFFD7E9DF.toInt())
+            setPadding(0, dp(5), 0, 0)
+            maxLines = 2
+        }
+        resourceCard.addView(resourceSummary)
+        val resourceParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        )
+        resourceParams.bottomMargin = dp(9)
+        root.addView(resourceCard, resourceParams)
+
+        val terminalPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = roundedBackground(intArrayOf(0xFF111C1A.toInt(), 0xFF0B1413.toInt()), 17)
+            setPadding(dp(9), dp(9), dp(9), dp(7))
+        }
+        val terminalHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), dp(1), dp(3), dp(8))
+        }
+        val terminalTitle = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        terminalTitle.addView(TextView(this).apply {
+            text = "TERMINAL"
+            textSize = 10f
+            letterSpacing = 0.16f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFE7F4EC.toInt())
+        })
+        terminalTitle.addView(TextView(this).apply {
+            text = "root@" + hostname + "  •  " + displayPath()
+            textSize = 8f
+            typeface = Typeface.create("monospace", Typeface.NORMAL)
+            setTextColor(0xFF7D9B8D.toInt())
+            setPadding(0, dp(3), 0, 0)
+        })
+        terminalHeader.addView(terminalTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        terminalHeader.addView(makePill("●  LIVE", 0xFFB7F36B.toInt(), 0xFF20321F.toInt()))
+        terminalHeader.addView(TextView(this).apply {
+            text = "CLR"
+            textSize = 9f
+            letterSpacing = 0.06f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(0xFF9AB5A8.toInt())
+            setPadding(dp(10), dp(7), dp(8), dp(7))
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Clear terminal screen"
+            setOnClickListener { output.clearTerminal() }
+        })
+        terminalPanel.addView(terminalHeader)
+        terminalPanel.addView(View(this).apply { setBackgroundColor(0xFF263A32.toInt()) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)))
+
+        scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setClipToPadding(false)
+            setVerticalScrollBarEnabled(true)
+            setPadding(0, dp(5), 0, dp(3))
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+        }
+        output = TerminalView(this).apply {
+            textSize = 13f
+            typeface = Typeface.create("monospace", Typeface.NORMAL)
+            setTextColor(0xFFDCEFE4.toInt())
+            setTextIsSelectable(false)
+            setPadding(dp(7), dp(7), dp(7), dp(10))
+        }
+        scroll.addView(output)
+        terminalPanel.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        root.addView(terminalPanel, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+
+        val dockLabel = TextView(this).apply {
+            text = "COMMAND INPUT"
+            textSize = 8f
+            letterSpacing = 0.15f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF78968A.toInt())
+            setPadding(dp(3), dp(9), 0, dp(5))
+        }
+        root.addView(dockLabel)
         val promptRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(10), dp(2), dp(5), dp(2))
-            background = roundedBackground(intArrayOf(0xFF172A40.toInt(), 0xFF132238.toInt()), 14)
+            background = roundedBackground(intArrayOf(0xFF1B2C25.toInt(), 0xFF14221E.toInt()), 13)
         }
         promptLabel = TextView(this).apply {
             text = prompt
             textSize = 10f
             typeface = Typeface.create("monospace", Typeface.BOLD)
-            setTextColor(0xFF86EFAC.toInt())
-            maxWidth = dp(105)
+            setTextColor(0xFFB7F36B.toInt())
+            maxWidth = dp(104)
             isSingleLine = true
         }
         promptRow.addView(promptLabel)
@@ -195,51 +339,94 @@ class MainActivity : Activity() {
             setSingleLine(true)
             textSize = 13f
             typeface = Typeface.create("monospace", Typeface.NORMAL)
-            setTextColor(0xFFFFFFFF.toInt())
-            setHintTextColor(0xFF71819D.toInt())
-            hint = "Command…"
+            setTextColor(0xFFF2F8F3.toInt())
+            setHintTextColor(0xFF789187.toInt())
+            hint = "Type a command…"
             imeOptions = EditorInfo.IME_ACTION_SEND
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setBackgroundColor(0x00000000)
             setPadding(dp(6), 0, dp(3), 0)
+            setSelectAllOnFocus(false)
             setOnEditorActionListener { _, actionId, event ->
                 val enter = actionId == EditorInfo.IME_ACTION_SEND ||
                     actionId == EditorInfo.IME_ACTION_DONE ||
                     (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_UP)
-                if (enter) { submitCommand(); true } else false
+                if (enter) {
+                    submitCommand()
+                    keepKeyboardOpen()
+                    true
+                } else false
             }
         }
-        promptRow.addView(input, LinearLayout.LayoutParams(0, dp(46), 1f))
-        val runButton = TextView(this).apply {
-            text = "➤"
-            textSize = 18f
+        promptRow.addView(input, LinearLayout.LayoutParams(0, dp(47), 1f))
+        promptRow.addView(TextView(this).apply {
+            text = "↵"
+            textSize = 20f
             gravity = Gravity.CENTER
-            setTextColor(0xFF071827.toInt())
-            background = roundedBackground(intArrayOf(0xFF7DD3FC.toInt(), 0xFF38BDF8.toInt()), 11)
-            setOnClickListener { submitCommand() }
-        }
-        promptRow.addView(runButton, LinearLayout.LayoutParams(dp(42), dp(40)))
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF0D1911.toInt())
+            background = roundedBackground(intArrayOf(0xFFB7F36B.toInt(), 0xFF8EDB64.toInt()), 11)
+            isClickable = true
+            isFocusable = true
+            contentDescription = "Run command"
+            setOnClickListener { submitCommand(); keepKeyboardOpen() }
+        }, LinearLayout.LayoutParams(dp(43), dp(41)))
         root.addView(promptRow)
 
-        // Keyboard rail is immediately accessible, above the terminal output.
+        input.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(editable: Editable?) {
+                if (!commandRunning || ctrlModifierArmed || altModifierArmed) return
+                val value = editable?.toString().orEmpty()
+                if (value.isNotEmpty()) {
+                    val composingStart = editable?.let { BaseInputConnection.getComposingSpanStart(it) } ?: -1
+                    val composingEnd = editable?.let { BaseInputConnection.getComposingSpanEnd(it) } ?: -1
+                    if (composingStart >= 0 || composingEnd >= 0) return
+                    sendTerminalInput(value, appendNewline = false)
+                    editable?.clear()
+                }
+            }
+        })
+        input.setOnKeyListener { _, keyCode, event ->
+            if (!commandRunning || event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            val sequence = when (keyCode) {
+                KeyEvent.KEYCODE_DEL -> "\u007F"
+                KeyEvent.KEYCODE_DPAD_UP -> "\u001B[A"
+                KeyEvent.KEYCODE_DPAD_DOWN -> "\u001B[B"
+                KeyEvent.KEYCODE_DPAD_RIGHT -> "\u001B[C"
+                KeyEvent.KEYCODE_DPAD_LEFT -> "\u001B[D"
+                KeyEvent.KEYCODE_MOVE_HOME -> "\u001B[H"
+                KeyEvent.KEYCODE_MOVE_END -> "\u001B[F"
+                KeyEvent.KEYCODE_TAB -> "\t"
+                KeyEvent.KEYCODE_ESCAPE -> "\u001B"
+                else -> null
+            }
+            if (sequence != null) {
+                sendTerminalInput(sequence, appendNewline = false)
+                true
+            } else false
+        }
+
         val shortcutsScroll = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
-            setPadding(0, dp(5), 0, dp(7))
+            setFillViewport(false)
+            setPadding(0, dp(7), 0, 0)
         }
         val shortcuts = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "/", "-", "|", "~", "Ctrl+C")
+        val keys = listOf("ESC", "TAB", "CTRL", "ALT", "←", "→", "↑", "↓", "HOME", "END", "Ctrl+C", "Ctrl+D", "Ctrl+U", "Ctrl+W")
         keys.forEach { key ->
             val keyView = TextView(this).apply {
                 text = key
-                textSize = 10f
+                textSize = 9f
                 typeface = Typeface.create("monospace", Typeface.BOLD)
                 gravity = Gravity.CENTER
-                setTextColor(0xFFCBDAEF.toInt())
-                setPadding(dp(10), dp(7), dp(10), dp(7))
-                background = roundedBackground(intArrayOf(0xFF1B2940.toInt(), 0xFF152136.toInt()), 9)
+                setTextColor(if (key.startsWith("Ctrl") || key == "CTRL" || key == "ALT") 0xFFB7F36B.toInt() else 0xFFC6D9CE.toInt())
+                setPadding(dp(11), dp(8), dp(11), dp(8))
+                background = roundedBackground(intArrayOf(0xFF1A2924.toInt(), 0xFF15221E.toInt()), 9)
                 isClickable = true
                 isFocusable = true
                 setOnClickListener { handleShortcut(key) }
@@ -251,54 +438,17 @@ class MainActivity : Activity() {
         shortcutsScroll.addView(shortcuts)
         root.addView(shortcutsScroll)
 
-        // The terminal receives all remaining height.
-        val terminalPanel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = roundedBackground(intArrayOf(0xFF101A2A.toInt(), 0xFF0D1523.toInt()), 18)
-            setPadding(dp(8), dp(8), dp(8), dp(6))
-        }
-        val terminalHeader = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), dp(1), dp(4), dp(5))
-        }
-        terminalHeader.addView(TextView(this).apply {
-            text = "TERMINAL"
-            textSize = 10f
-            letterSpacing = 0.13f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFFE2EDFC.toInt())
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        terminalHeader.addView(makePill("●  LIVE", 0xFF86EFAC.toInt(), 0xFF142B2A.toInt()))
-        terminalPanel.addView(terminalHeader)
-
-        scroll = ScrollView(this).apply {
-            isFillViewport = true
-            setClipToPadding(false)
-            setPadding(0, dp(2), 0, dp(3))
-        }
-        output = TextView(this).apply {
-            textSize = 12.5f
-            typeface = Typeface.create("monospace", Typeface.NORMAL)
-            setTextColor(0xFFDCE7F5.toInt())
-            setTextIsSelectable(true)
-            setLineSpacing(dp(3).toFloat(), 1f)
-            setPadding(dp(7), dp(6), dp(7), dp(10))
-        }
-        scroll.addView(output)
-        terminalPanel.addView(scroll, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-        root.addView(terminalPanel, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-
-        frame.addView(root, FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-        ))
+        frame.addView(root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         setContentView(frame)
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         updateRuntimeStatus()
         updateFolderStatus()
+        updateHostResourceSummary()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::resourceSummary.isInitialized) updateHostResourceSummary()
     }
 
     /** Opens the secondary controls without shrinking the terminal workspace. */
@@ -323,7 +473,7 @@ class MainActivity : Activity() {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(18), dp(22), dp(18), dp(18))
-            background = roundedBackground(intArrayOf(0xFF142238.toInt(), 0xFF0B1422.toInt()), 0)
+            background = roundedBackground(intArrayOf(0xFF14231F.toInt(), 0xFF0B1413.toInt()), 0)
             elevation = dp(16).toFloat()
         }
         val panelParams = FrameLayout.LayoutParams(
@@ -331,7 +481,16 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             Gravity.START
         )
-        overlay.addView(panel, panelParams)
+        val panelScroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+        }
+        panelScroll.addView(panel, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+        overlay.addView(panelScroll, panelParams)
 
         panel.addView(TextView(this).apply {
             text = "NEXORA"
@@ -344,7 +503,7 @@ class MainActivity : Activity() {
             text = "WORKSPACE & SETTINGS"
             textSize = 9f
             letterSpacing = 0.15f
-            setTextColor(0xFF7DD3FC.toInt())
+            setTextColor(0xFFB7F36B.toInt())
             setPadding(0, dp(3), 0, dp(18))
         })
 
@@ -353,7 +512,7 @@ class MainActivity : Activity() {
             textSize = 9f
             letterSpacing = 0.14f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF8295B3.toInt())
+            setTextColor(0xFF78968A.toInt())
             setPadding(dp(2), dp(2), 0, dp(8))
         }
         panel.addView(authHeading)
@@ -363,11 +522,11 @@ class MainActivity : Activity() {
             textSize = 11f
             setTextColor(0xFFE1EDFC.toInt())
             setPadding(dp(12), dp(10), dp(12), dp(10))
-            background = roundedBackground(intArrayOf(0xFF101A2A.toInt(), 0xFF101A2A.toInt()), 12)
+            background = roundedBackground(intArrayOf(0xFF111C1A.toInt(), 0xFF111C1A.toInt()), 12)
         }
         panel.addView(accountLabel)
 
-        val githubLogin = makeActionButton("⌘  CONTINUE WITH GITHUB", 0xFFFFFFFF.toInt(), 0xFF26364E.toInt(), false) {
+        val githubLogin = makeActionButton("⌘  CONTINUE WITH GITHUB", 0xFFFFFFFF.toInt(), 0xFF1A2924.toInt(), false) {
             decor.removeView(overlay)
             startProviderLogin("github")
         }
@@ -375,7 +534,7 @@ class MainActivity : Activity() {
         githubParams.topMargin = dp(7)
         panel.addView(githubLogin, githubParams)
 
-        val signOut = makeActionButton("SIGN OUT", 0xFFFECACA.toInt(), 0xFF3B202B.toInt(), false) {
+        val signOut = makeActionButton("SIGN OUT", 0xFFFECACA.toInt(), 0xFF3A2524.toInt(), false) {
             decor.removeView(overlay)
             supabaseAuth.signOut { result ->
                 result.onSuccess {
@@ -393,13 +552,13 @@ class MainActivity : Activity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(14), dp(14), dp(14))
-            background = roundedBackground(intArrayOf(0xFF193858.toInt(), 0xFF17243D.toInt()), 16)
+            background = roundedBackground(intArrayOf(0xFF1B3329.toInt(), 0xFF14221E.toInt()), 16)
         }
         hero.addView(TextView(this).apply {
             text = "LINUX, IN YOUR POCKET"
             textSize = 10f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF7DD3FC.toInt())
+            setTextColor(0xFFB7F36B.toInt())
         })
         hero.addView(TextView(this).apply {
             text = "Ubuntu 24.04 LTS"
@@ -409,13 +568,13 @@ class MainActivity : Activity() {
             setPadding(0, dp(5), 0, dp(3))
         })
         hero.addView(TextView(this).apply {
-            text = "A standalone Ubuntu ARM64 virtual machine powered by QEMU."
+            text = "A rootless Ubuntu ARM64 environment powered by PRoot."
             textSize = 11f
-            setTextColor(0xFFB6C8E2.toInt())
+            setTextColor(0xFFB5C9BD.toInt())
         })
         panel.addView(hero)
 
-        val install = makeActionButton("↓  INSTALL / REPAIR UBUNTU", 0xFF06243A.toInt(), 0xFF38BDF8.toInt(), true) {
+        val install = makeActionButton("↓  INSTALL / REPAIR UBUNTU", 0xFF06243A.toInt(), 0xFF8EDB64.toInt(), true) {
             decor.removeView(overlay)
             installUbuntuRuntime()
         }
@@ -423,7 +582,7 @@ class MainActivity : Activity() {
         installParams.topMargin = dp(14)
         panel.addView(install, installParams)
 
-        val status = makeActionButton("◉  CHECK UBUNTU STATUS", 0xFFD5E7FF.toInt(), 0xFF263B5A.toInt(), false) {
+        val status = makeActionButton("◉  CHECK UBUNTU STATUS", 0xFFDCEFE4.toInt(), 0xFF1A2924.toInt(), false) {
             appendLine(if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04: installed and ready." else "Ubuntu 24.04: not installed.")
             updateRuntimeStatus()
             decor.removeView(overlay)
@@ -432,17 +591,65 @@ class MainActivity : Activity() {
         statusParams.topMargin = dp(8)
         panel.addView(status, statusParams)
 
+        val desktopHeading = TextView(this).apply {
+            text = "LINUX DESKTOP  •  XFCE / VNC"
+            textSize = 9f
+            letterSpacing = 0.14f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFB7F36B.toInt())
+            setPadding(dp(2), dp(18), 0, dp(7))
+        }
+        panel.addView(desktopHeading)
+
+        val desktopInstall = makeActionButton("▣  INSTALL XFCE + TIGERVNC", 0xFF06243A.toInt(), 0xFF8EDB64.toInt(), true) {
+            decor.removeView(overlay)
+            runDesktopAction("install")
+        }
+        panel.addView(desktopInstall, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43)))
+
+        val desktopPassword = makeActionButton("⌑  SET VNC PASSWORD", 0xFFDCEFE4.toInt(), 0xFF1A2924.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("password")
+        }
+        val desktopPasswordParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopPasswordParams.topMargin = dp(6)
+        panel.addView(desktopPassword, desktopPasswordParams)
+
+        val desktopStart = makeActionButton("▶  START DESKTOP", 0xFFB8F7D4.toInt(), 0xFF17352F.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("start")
+        }
+        val desktopStartParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopStartParams.topMargin = dp(6)
+        panel.addView(desktopStart, desktopStartParams)
+
+        val desktopStop = makeActionButton("■  STOP DESKTOP", 0xFFFECACA.toInt(), 0xFF3A2524.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("stop")
+        }
+        val desktopStopParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopStopParams.topMargin = dp(6)
+        panel.addView(desktopStop, desktopStopParams)
+
+        val desktopStatus = makeActionButton("◉  DESKTOP STATUS", 0xFFDCEFE4.toInt(), 0xFF1A2924.toInt(), false) {
+            decor.removeView(overlay)
+            runDesktopAction("status")
+        }
+        val desktopStatusParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(40))
+        desktopStatusParams.topMargin = dp(6)
+        panel.addView(desktopStatus, desktopStatusParams)
+
         val section = TextView(this).apply {
             text = "CONNECTIONS"
             textSize = 9f
             letterSpacing = 0.14f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF8295B3.toInt())
+            setTextColor(0xFF78968A.toInt())
             setPadding(dp(2), dp(22), 0, dp(8))
         }
         panel.addView(section)
 
-        val runtimeCard = makeInfoCard("UBUNTU RUNTIME", if (ubuntuRuntime.isInstalled()) "●  READY" else "○  NOT INSTALLED", 0xFF7DD3FC.toInt())
+        val runtimeCard = makeInfoCard("UBUNTU RUNTIME", if (ubuntuRuntime.isInstalled()) "●  READY" else "○  NOT INSTALLED", 0xFFB7F36B.toInt())
         runtimeStatus = runtimeCard.second
         panel.addView(runtimeCard.first, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(70)))
         val storageCard = makeInfoCard("ANDROID STORAGE", if (preferences.getString("android_tree_uri", null) != null) "●  Connected" else "○  Not connected", 0xFFC4B5FD.toInt())
@@ -460,7 +667,7 @@ class MainActivity : Activity() {
         panel.addView(storage, storageActionParams)
 
         val help = makeActionButton("⌨  COMMAND HELP", 0xFFBDEBFF.toInt(), 0xFF18334A.toInt(), false) {
-            appendLine("Commands: help, version, install-ubuntu, qemu-check, qemu-start, qemu-stop, ubuntu-status, clear, exit")
+            appendLine("Commands: help, version, install-ubuntu, ubuntu-status, desktop install|password|start|stop|status|connect, pwd, ls, cd, clear, exit")
             decor.removeView(overlay)
         }
         val helpParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
@@ -468,7 +675,7 @@ class MainActivity : Activity() {
         panel.addView(help, helpParams)
 
         val clear = makeActionButton("✦  CLEAR TERMINAL", 0xFFB8F7D4.toInt(), 0xFF17352F.toInt(), false) {
-            output.text = ""
+            output.clearTerminal()
             decor.removeView(overlay)
         }
         val clearParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(43))
@@ -557,14 +764,14 @@ class MainActivity : Activity() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(11), dp(10), dp(9))
-            background = roundedBackground(intArrayOf(0xFF141F32.toInt(), 0xFF101A2A.toInt()), 15)
+            background = roundedBackground(intArrayOf(0xFF141F32.toInt(), 0xFF111C1A.toInt()), 15)
         }
         card.addView(TextView(this).apply {
             text = title
             textSize = 8f
             letterSpacing = 0.1f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF8295B3.toInt())
+            setTextColor(0xFF78968A.toInt())
         })
         val valueView = TextView(this).apply {
             text = value
@@ -622,11 +829,9 @@ class MainActivity : Activity() {
         if (terminalReceiverRegistered) return
         val filter = IntentFilter().apply {
             addAction(TerminalExecutionService.ACTION_OUTPUT)
+            addAction(TerminalExecutionService.ACTION_OUTPUT_CHUNK)
             addAction(TerminalExecutionService.ACTION_FINISHED)
-            addAction(TerminalExecutionService.ACTION_QEMU_INSTALL_FINISHED)
-            addAction(TerminalExecutionService.ACTION_QEMU_VM_STARTED)
-            addAction(TerminalExecutionService.ACTION_QEMU_VM_STOPPED)
-            addAction(TerminalExecutionService.ACTION_QEMU_SERIAL_OUTPUT)
+            addAction(TerminalExecutionService.ACTION_PROOT_INSTALL_FINISHED)
         }
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(terminalReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -635,9 +840,6 @@ class MainActivity : Activity() {
             registerReceiver(terminalReceiver, filter)
         }
         terminalReceiverRegistered = true
-        startService(Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_QUERY_QEMU_VM
-        })
     }
 
     // Keep the receiver registered while the Activity is stopped so progress
@@ -666,14 +868,14 @@ class MainActivity : Activity() {
                 setSingleLine(true)
             }
 
-        val userField = field("Username (e.g. cris)")
-        val hostField = field("Hostname (e.g. nexora)")
+        val userField = field("Profile label (e.g. cris)")
+        val hostField = field("Prompt hostname (e.g. nexora)")
         panel.addView(userField)
         panel.addView(hostField)
 
         val dialog = AlertDialog.Builder(this)
-            .setTitle("Configure Ubuntu VM")
-            .setMessage("Choose the Linux username and hostname for your QEMU-powered Ubuntu environment.")
+            .setTitle("Configure Ubuntu")
+            .setMessage("These values customize the NEXORA prompt. Ubuntu currently runs as root inside PRoot.")
             .setView(panel)
             .setCancelable(false)
             .setPositiveButton("Create profile", null)
@@ -707,14 +909,15 @@ class MainActivity : Activity() {
     }
 
     private fun printWelcome() {
-        output.text = ""
+        output.clearTerminal()
         appendLine("NEXORA 0.3.0 — Android")
-        appendLine("Ubuntu profile: $username@$hostname")
-        appendLine("Home: /home/$username")
+        appendLine("Shell: root@$hostname")
+        appendLine("Profile label: $username")
+        appendLine("Home: /root")
         appendLine("Your Terminal. Your Universe.")
         appendLine("")
-        appendLine("QEMU Ubuntu ARM64: ${if (ubuntuRuntime.isInstalled()) "READY" else "NOT INSTALLED"}")
-        appendLine("Run install-ubuntu to prepare the VM, then qemu-start to boot it.")
+        appendLine("PRoot Ubuntu ARM64: ${if (ubuntuRuntime.isInstalled()) "READY" else "NOT INSTALLED"}")
+        appendLine("Run install-ubuntu once, then enter Linux commands directly.")
         appendLine("Type 'help' to see available commands.")
         promptLabel.text = prompt
         updateRuntimeStatus()
@@ -723,150 +926,163 @@ class MainActivity : Activity() {
     }
 
     private fun displayPath(): String =
-        if (workingDirectory == filesDir) "~" else "~/${workingDirectory.relativeTo(filesDir).path}"
+        ubuntuRuntime.currentWorkingDirectory().let { if (it == "/root") "~" else it }
 
     private fun submitCommand() {
-        val line = input.text.toString().trim()
+        val rawLine = input.text.toString()
+        keepKeyboardOpen()
         input.text.clear()
+        if (commandRunning) {
+            when {
+                ctrlModifierArmed && rawLine.length == 1 -> {
+                    val key = rawLine[0].uppercaseChar()
+                    if (key in 'A'..'Z') {
+                        sendTerminalInput((key.code - 64).toChar().toString(), appendNewline = false)
+                    } else {
+                        appendLine("CTRL expects one letter (A–Z).")
+                    }
+                }
+                ctrlModifierArmed -> appendLine("CTRL expects one letter (A–Z).")
+                altModifierArmed && rawLine.isNotEmpty() ->
+                    sendTerminalInput("\u001B$rawLine", appendNewline = false)
+                else -> sendTerminalInput(rawLine)
+            }
+            ctrlModifierArmed = false
+            altModifierArmed = false
+            return
+        }
+        val line = rawLine.trim()
         if (line.isEmpty()) return
         commandHistory.add(line)
         if (commandHistory.size > 300) commandHistory.removeAt(0)
+        persistCommandHistory()
         historyIndex = commandHistory.size
         appendLine("$prompt$line")
 
         val parts = line.split(Regex("\\s+"), limit = 2)
-        val command = parts[0].lowercase(Locale.ROOT)
-        val argument = parts.getOrNull(1).orEmpty()
-
-        when (command) {
-            "help" -> {
-                appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, qemu-check, qemu-install, qemu-start, qemu-stop, qemu-status, exit")
-                appendLine("Ubuntu shell commands are available after qemu-start boots the VM.")
-            }
-            "version" -> appendLine("NEXORA Android 0.3.0")
-            "clear", "cls" -> output.text = ""
-            "install-ubuntu", "qemu-install" -> installUbuntuRuntime()
+        when (parts[0].lowercase(Locale.ROOT)) {
+            "help" -> appendLine("NEXORA: help, version, clear, install-ubuntu, ubuntu-status, desktop install|password|start|stop|status|connect, pwd, ls, cd, exit")
+            "version" -> appendLine("NEXORA Android 0.5.0 (PRoot)")
+            "clear", "cls" -> { output.clearTerminal() }
+            "install-ubuntu" -> installUbuntuRuntime()
             "ubuntu-status" -> appendLine(
-                if (ubuntuRuntime.isInstalled()) "QEMU Ubuntu ARM64 VM: prepared"
-                else "QEMU Ubuntu ARM64 VM: not installed"
+                if (ubuntuRuntime.isInstalled()) "Ubuntu 24.04 ARM64 through PRoot: ready"
+                else "Ubuntu 24.04 ARM64 through PRoot: not installed"
             )
-            "qemu-check" -> checkQemuRuntime()
-            "qemu-start" -> startQemuVm()
-            "qemu-stop" -> stopQemuVm()
-            "qemu-status" -> {
-                val diskReady = File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2").isFile
-                val seedReady = File(filesDir, "qemu/vm/cidata.img").isFile
-                val qemuReady = File(filesDir, "qemu/arm64-v8a/qemu-system-aarch64").isFile
-                val firmwareReady = File(filesDir, "qemu/firmware/aavmf/AAVMF_CODE.fd").isFile
-                appendLine("QEMU VM: ${if (qemuVmActive) "RUNNING" else "STOPPED"}")
-                appendLine("QEMU Android binary: ${if (qemuReady) "installed" else "missing"}")
-                appendLine("ARM64 UEFI firmware: ${if (firmwareReady) "installed" else "missing"}")
-                appendLine("Ubuntu ARM64 disk: ${if (diskReady) "prepared" else "not installed"}")
-                appendLine("NoCloud first-boot seed: ${if (seedReady) "prepared" else "missing"}")
-            }
-            "exit", "logout" -> if (qemuVmActive) stopQemuVm()
-                else appendLine("QEMU Ubuntu VM is stopped.")
+            "desktop" -> handleDesktopCommand(parts.getOrNull(1).orEmpty())
             else -> {
-                if (qemuVmActive) {
-                    sendQemuInput(line)
-                } else if (!ubuntuRuntime.isInstalled()) {
-                    appendLine("Ubuntu ARM64 is not installed. Run install-ubuntu, then qemu-start.")
+                if (!ubuntuRuntime.isInstalled()) {
+                    appendLine("Ubuntu is not installed. Run install-ubuntu first.")
                 } else {
-                    appendLine("Ubuntu is installed, but its QEMU virtual machine is stopped. Run qemu-start before entering Linux commands.")
+                    runUbuntuCommand(line)
                 }
             }
         }
         promptLabel.text = prompt
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        output.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
 
-    private fun startQemuVm() {
-        if (qemuVmActive) {
-            appendLine("QEMU Ubuntu VM is already running.")
+    private fun handleDesktopCommand(argument: String) {
+        if (!ubuntuRuntime.isInstalled()) {
+            appendLine("Ubuntu is not installed. Run install-ubuntu first.")
             return
         }
-        val disk = File(filesDir, "qemu/vm/ubuntu-24.04-arm64.qcow2")
-        val seed = File(filesDir, "qemu/vm/cidata.img")
-        if (!disk.isFile || !seed.isFile) {
-            appendLine("QEMU Ubuntu VM is not prepared. Run qemu-install first.")
+        val action = argument.trim().lowercase(Locale.ROOT)
+        if (commandRunning && action != "stop" && action != "connect") {
+            appendLine("A terminal session is already active. Stop the desktop session before running another desktop action.")
             return
         }
-        input.isEnabled = false
-        appendLine("Starting Ubuntu ARM64 under QEMU TCG (offline mode; guest networking is not built yet)…")
+        when (action) {
+            "install" -> {
+                appendLine("Installing XFCE, DBus and TigerVNC…")
+                runUbuntuCommand(DesktopCommands.INSTALL)
+            }
+            "password" -> {
+                appendLine("Set a VNC access password. The terminal will ask you to enter it twice.")
+                runUbuntuCommand(DesktopCommands.SET_PASSWORD)
+            }
+            "start" -> {
+                appendLine("Starting XFCE desktop on localhost:5901…")
+                desktopSessionRunning = true
+                runUbuntuCommand(DesktopCommands.START)
+            }
+            "stop" -> {
+                if (desktopSessionRunning && commandRunning) {
+                    appendLine("Stopping XFCE and TigerVNC…")
+                    sendTerminalInput("\u0003", appendNewline = false)
+                } else {
+                    runUbuntuCommand(DesktopCommands.STOP)
+                }
+            }
+            "status" -> runUbuntuCommand(DesktopCommands.STATUS)
+            "connect" -> {
+                appendLine("Open a VNC Viewer app and connect to 127.0.0.1:5901.")
+                appendLine("Keep NEXORA running in the background while using the viewer.")
+            }
+            else -> appendLine(
+                "Desktop commands: desktop install | password | start | stop | status | connect"
+            )
+        }
+    }
+
+    private fun runDesktopAction(action: String) {
+        if (!ubuntuRuntime.isInstalled()) {
+            appendLine("Ubuntu is not installed. Run INSTALL / REPAIR UBUNTU first.")
+            return
+        }
+        handleDesktopCommand(action)
+    }
+
+    private fun runUbuntuCommand(command: String) {
+        commandRunning = true
+        input.isEnabled = true
+        keepKeyboardOpen()
+        input.hint = "Input to process…"
+        promptLabel.text = "stdin ›"
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_START_QEMU_VM
+            action = TerminalExecutionService.ACTION_EXECUTE_COMMAND
+            putExtra(TerminalExecutionService.EXTRA_COMMAND, command)
+            putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
+            putExtra(TerminalExecutionService.EXTRA_UID, ubuntuUid)
+            putExtra(TerminalExecutionService.EXTRA_TREE_URI, preferences.getString("android_tree_uri", null))
         }
         try {
             if (Build.VERSION.SDK_INT >= 26) startForegroundService(serviceIntent)
             else startService(serviceIntent)
         } catch (error: Exception) {
+            commandRunning = false
+            desktopSessionRunning = false
             input.isEnabled = true
-            appendLine("Could not start QEMU: ${error.message}")
+            input.hint = "Command…"
+            promptLabel.text = prompt
+            appendLine("Could not start Ubuntu command: ${error.message}")
         }
     }
 
-    private fun stopQemuVm() {
-        if (!qemuVmActive) {
-            appendLine("QEMU Ubuntu VM is not running.")
-            return
+    private fun sendTerminalInput(value: String, appendNewline: Boolean = true) {
+        val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
+            action = TerminalExecutionService.ACTION_SEND_INPUT
+            putExtra(TerminalExecutionService.EXTRA_INPUT, value)
+            putExtra(TerminalExecutionService.EXTRA_INPUT_APPEND_NEWLINE, appendNewline)
         }
-        appendLine("Requesting Ubuntu VM shutdown…")
-        startService(Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_STOP_QEMU_VM
-        })
-    }
-
-    private fun sendQemuInput(command: String) {
-        sendQemuSerial("$command\n")
-    }
-
-    private fun sendQemuSerial(text: String) {
         try {
-            startService(Intent(this, TerminalExecutionService::class.java).apply {
-                action = TerminalExecutionService.ACTION_QEMU_VM_INPUT
-                putExtra(TerminalExecutionService.EXTRA_QEMU_INPUT, text)
-            })
+            startService(serviceIntent)
         } catch (error: Exception) {
-            appendLine("Could not send input to QEMU: ${error.message}")
+            appendLine("Could not send terminal input: ${error.message}")
         }
-    }
-
-    /** Verifies the packaged Android QEMU executable without starting a guest VM. */
-    private fun checkQemuRuntime() {
-        input.isEnabled = false
-        appendLine("Checking standalone QEMU for Android ARM64…")
-        Thread {
-            val result = runCatching {
-                val installer = QemuBinaryInstaller(this)
-                val installed = installer.installFromAssets()
-                installer.smokeTest(installed)
-            }
-            runOnUiThread {
-                result.onSuccess { version ->
-                    appendLine("QEMU Android runtime: VERIFIED")
-                    appendLine(version)
-                    appendLine("The executable and its Android shared libraries start correctly.")
-                    appendLine("QEMU is verified. Run install-ubuntu to prepare Ubuntu, then qemu-start.")
-                }.onFailure { error ->
-                    appendLine("QEMU runtime check failed: ${error.message ?: "unknown error"}")
-                }
-                input.isEnabled = true
-                promptLabel.text = prompt
-                input.requestFocus()
-            }
-        }.start()
     }
 
     private fun installUbuntuRuntime() {
         if (ubuntuRuntime.isInstalled()) {
-            appendLine("QEMU Ubuntu VM is already prepared. Run qemu-start.")
+            appendLine("Ubuntu through PRoot is already prepared.")
             return
         }
-        appendLine("Starting QEMU installation and Ubuntu 24.04 ARM64 preparation…")
-        appendLine("The first setup downloads the official Ubuntu cloud image; keep enough free storage.")
+        appendLine("Starting PRoot installation and Ubuntu 24.04 ARM64 preparation…")
+        appendLine("The first setup downloads Ubuntu Base; keep at least 700 MB free.")
         input.isEnabled = false
+        input.hint = "Command…"
         val serviceIntent = Intent(this, TerminalExecutionService::class.java).apply {
-            action = TerminalExecutionService.ACTION_PREPARE_QEMU_UBUNTU
+            action = TerminalExecutionService.ACTION_PREPARE_PROOT_UBUNTU
             putExtra(TerminalExecutionService.EXTRA_USERNAME, username)
             putExtra(TerminalExecutionService.EXTRA_HOSTNAME, hostname)
         }
@@ -875,56 +1091,60 @@ class MainActivity : Activity() {
             else startService(serviceIntent)
         } catch (error: Exception) {
             input.isEnabled = true
-            appendLine("Could not start QEMU installer: ${error.message}")
+            appendLine("Could not start PRoot installer: ${error.message}")
         }
     }
 
     private fun handleShortcut(key: String) {
-        if (qemuVmActive) {
-            when (key) {
-                "ESC" -> sendQemuSerial("\u001B")
-                "TAB" -> sendQemuSerial("\t")
-                "←" -> sendQemuSerial("\u001B[D")
-                "→" -> sendQemuSerial("\u001B[C")
-                "↑" -> sendQemuSerial("\u001B[A")
-                "↓" -> sendQemuSerial("\u001B[B")
-                "HOME" -> sendQemuSerial("\u001B[H")
-                "END" -> sendQemuSerial("\u001B[F")
-                "Ctrl+C" -> sendQemuSerial("\u0003")
-                "CTRL", "ALT" -> Toast.makeText(this, "Use Ctrl+C to interrupt the running command.", Toast.LENGTH_SHORT).show()
-                else -> insertText(key)
-            }
-            input.requestFocus()
-            return
-        }
         when (key) {
-            "ESC" -> Unit
-            "TAB" -> insertText("    ")
-            "CTRL" -> Toast.makeText(this, "Choose a Ctrl shortcut such as Ctrl+C.", Toast.LENGTH_SHORT).show()
-            "ALT" -> Unit
-            "←" -> moveCursor(-1)
-            "→" -> moveCursor(1)
-            "↑" -> {
+            "ESC" -> if (commandRunning) sendTerminalInput("\u001B", appendNewline = false) else insertText("\u001B")
+            "TAB" -> if (commandRunning) sendTerminalInput("\t", appendNewline = false) else insertText("    ")
+            "CTRL" -> {
+                ctrlModifierArmed = !ctrlModifierArmed
+                if (ctrlModifierArmed) altModifierArmed = false
+                Toast.makeText(this, if (ctrlModifierArmed) "Ctrl armed — enter a letter" else "Ctrl cancelled", Toast.LENGTH_SHORT).show()
+            }
+            "ALT" -> {
+                altModifierArmed = !altModifierArmed
+                if (altModifierArmed) ctrlModifierArmed = false
+                Toast.makeText(this, if (altModifierArmed) "Alt armed — enter a key" else "Alt cancelled", Toast.LENGTH_SHORT).show()
+            }
+            "←" -> if (commandRunning) sendTerminalInput("\u001B[D", false) else moveCursor(-1)
+            "→" -> if (commandRunning) sendTerminalInput("\u001B[C", false) else moveCursor(1)
+            "↑" -> if (commandRunning) sendTerminalInput("\u001B[A", false) else {
                 if (commandHistory.isNotEmpty()) {
                     historyIndex = (historyIndex - 1).coerceAtLeast(0)
                     input.setText(commandHistory[historyIndex])
                     input.setSelection(input.text.length)
                 }
             }
-            "↓" -> {
+            "↓" -> if (commandRunning) sendTerminalInput("\u001B[B", false) else {
                 historyIndex = (historyIndex + 1).coerceAtMost(commandHistory.size)
                 input.setText(commandHistory.getOrNull(historyIndex).orEmpty())
                 input.setSelection(input.text.length)
             }
-            "HOME" -> input.setSelection(0)
-            "END" -> input.setSelection(input.text.length)
+            "HOME" -> if (commandRunning) sendTerminalInput("\u001B[H", false) else input.setSelection(0)
+            "END" -> if (commandRunning) sendTerminalInput("\u001B[F", false) else input.setSelection(input.text.length)
             "Ctrl+C" -> {
-                input.text.clear()
-                appendLine("^C")
+                if (commandRunning) sendTerminalInput("\u0003", appendNewline = false)
+                else { input.text.clear(); appendLine("^C") }
             }
+            "Ctrl+D" -> if (commandRunning) sendTerminalInput("\u0004", appendNewline = false) else insertText(key)
+            "Ctrl+U" -> if (commandRunning) sendTerminalInput("\u0015", appendNewline = false) else insertText(key)
+            "Ctrl+W" -> if (commandRunning) sendTerminalInput("\u0017", appendNewline = false) else insertText(key)
             else -> insertText(key)
         }
+        keepKeyboardOpen()
+    }
+
+    /** Keep the Android IME attached while commands and full-screen programs run. */
+    private fun keepKeyboardOpen() {
+        if (!::input.isInitialized || !input.isEnabled) return
         input.requestFocus()
+        input.post {
+            val manager = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+            manager?.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     private fun insertText(value: String) {
@@ -978,13 +1198,62 @@ class MainActivity : Activity() {
         false
     }
 
+    private fun restoreCommandHistory() {
+        commandHistory.clear()
+        val saved = preferences.getString("command_history", null) ?: return
+        try {
+            val entries = JSONArray(saved)
+            for (index in 0 until entries.length()) {
+                val entry = entries.optString(index)
+                if (entry.isNotBlank()) commandHistory.add(entry)
+            }
+            if (commandHistory.size > 300) {
+                commandHistory.subList(0, commandHistory.size - 300).clear()
+            }
+            historyIndex = commandHistory.size
+        } catch (_: Exception) {
+            // Ignore a damaged history preference instead of preventing startup.
+            commandHistory.clear()
+            preferences.edit().remove("command_history").apply()
+        }
+    }
+
+    private fun persistCommandHistory() {
+        val entries = JSONArray()
+        commandHistory.forEach { entries.put(it) }
+        preferences.edit().putString("command_history", entries.toString()).apply()
+    }
+
     private fun appendLine(value: String) {
         appendText("$value\n")
     }
 
     private fun appendText(value: String) {
-        output.append(value)
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        // Preserve the user's reading position when they scroll up through logs.
+        val wasAtBottom = scroll.height + scroll.scrollY >= scroll.getChildAt(0).height - dp(48)
+        output.feed(value)
+        if (wasAtBottom) output.post { scroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    /**
+     * Shows Android host resources only. PRoot shares the host kernel and these
+     * figures are not measurements of an isolated Ubuntu guest.
+     */
+    private fun updateHostResourceSummary() {
+        if (!::resourceSummary.isInitialized) return
+        val memory = android.app.ActivityManager.MemoryInfo()
+        (getSystemService(ACTIVITY_SERVICE) as? android.app.ActivityManager)
+            ?.getMemoryInfo(memory)
+        val totalRamMb = memory.totalMem / (1024L * 1024L)
+        val availableRamMb = memory.availMem / (1024L * 1024L)
+        val storage = android.os.StatFs(filesDir.absolutePath)
+        val totalStorageMb = storage.totalBytes / (1024L * 1024L)
+        val freeStorageMb = storage.availableBytes / (1024L * 1024L)
+        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+        resourceSummary.text =
+            "RAM  $availableRamMb MB free / $totalRamMb MB   ·   " +
+            "APP STORAGE  $freeStorageMb MB free / $totalStorageMb MB\n" +
+            "CPU  ${Runtime.getRuntime().availableProcessors()} cores   ·   ABI  $abi   ·   Android ${Build.VERSION.RELEASE}"
     }
 
     private fun dp(value: Int): Int =

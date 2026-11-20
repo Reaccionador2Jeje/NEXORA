@@ -18,9 +18,9 @@ The desktop QEMU integration has started. A dedicated GitHub Actions workflow in
 
 The desktop CLI includes `qemu-check` (checks `qemu-system-x86_64` and `qemu-img`), `qemu-version`, `qemu-install` (downloads and SHA-256 verifies the Ubuntu 24.04 x86_64 cloud disk, then prepares a persistent 20 GiB QCOW2 disk), and `qemu-start <disk.qcow2>` (foreground serial-console boot). Set `NEXORA_QEMU_BIN` to override QEMU discovery. First-boot cloud-init setup and managed VM lifecycle remain in progress; see [QEMU PC integration](docs/QEMU_PC_INTEGRATION.md).
 
-## Android runtime migration
+## Android runtime
 
-The Android app now selects QEMU System Emulation as its Linux runtime. Android CI builds the standalone ARM64 QEMU executable, packages its shared libraries and AAVMF firmware into the APK, and then builds the APK from that verified artifact. Ubuntu 24.04 is provisioned as a persistent VM and exposed through the serial terminal. Physical-device boot, persistence, and recovery acceptance tests are still required; PRoot is no longer part of the Android installer or APK.
+Android uses PRoot rather than QEMU: Ubuntu userspace runs directly on Android's Linux kernel without booting a separate guest kernel. Commands currently run as individual processes, so interactive shell persistence and cross-command working-directory state are still planned. Desktop QEMU work remains separate.
 
 ## Project status
 

@@ -280,15 +280,13 @@ fn expected_sha256(checksums: &Path) -> Result<String, String> {
 }
 
 fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
+    // Use certutil on Windows: Get-FileHash is not guaranteed to be
+    // available in the PowerShell environment used by all Windows runners.
     #[cfg(windows)]
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "(Get-FileHash -Algorithm SHA256 -LiteralPath $args[0]).Hash",
-        ])
+    let output = Command::new("certutil")
+        .arg("-hashfile")
         .arg(file)
+        .arg("SHA256")
         .output();
     #[cfg(not(windows))]
     let output = Command::new("sha256sum").arg(file).output();
@@ -300,6 +298,18 @@ fn verify_sha256(file: &Path, expected: &str) -> Result<(), String> {
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
+    #[cfg(windows)]
+    let actual = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|line| {
+            line.chars()
+                .filter(|character| !character.is_whitespace())
+                .collect::<String>()
+        })
+        .find(|line| line.len() == 64 && line.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        .map(|hash| hash.to_ascii_lowercase())
+        .ok_or_else(|| "Could not parse certutil SHA-256 output".to_string())?;
+    #[cfg(not(windows))]
     let actual = String::from_utf8_lossy(&output.stdout)
         .split_whitespace()
         .find(|part| part.len() == 64 && part.bytes().all(|byte| byte.is_ascii_hexdigit()))
@@ -384,10 +394,8 @@ mod tests {
 
     #[test]
     fn extracts_ubuntu_image_checksum_from_manifest() {
-        let path = std::env::temp_dir().join(format!(
-            "nexora-sha256-manifest-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("nexora-sha256-manifest-{}.txt", std::process::id()));
         let expected = "a".repeat(64);
         fs::write(
             &path,
@@ -401,10 +409,8 @@ mod tests {
 
     #[test]
     fn rejects_manifest_without_ubuntu_image_checksum() {
-        let path = std::env::temp_dir().join(format!(
-            "nexora-sha256-invalid-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("nexora-sha256-invalid-{}.txt", std::process::id()));
         fs::write(&path, format!("{}  another.img\n", "b".repeat(64))).unwrap();
 
         assert!(expected_sha256(&path).is_err());
@@ -413,14 +419,13 @@ mod tests {
 
     #[test]
     fn verifies_sha256_on_the_current_host() {
-        let path = std::env::temp_dir().join(format!(
-            "nexora-sha256-content-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("nexora-sha256-content-{}.txt", std::process::id()));
         fs::write(&path, b"abc").unwrap();
 
         let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-        assert!(super::verify_sha256(&path, expected).is_ok());
+        super::verify_sha256(&path, expected)
+            .unwrap_or_else(|error| panic!("SHA-256 verification failed: {error}"));
         fs::remove_file(path).unwrap();
     }
 }

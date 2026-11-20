@@ -1,25 +1,22 @@
 # NEXORA Android
 
-Native Android terminal powered by a standalone ARM64 Ubuntu virtual machine.
+Native Android terminal running Ubuntu 24.04 ARM64 through PRoot.
 
-## Open and build
+## Build
 
-Open this directory in Android Studio with JDK 17 and Android SDK Platform 35. The distributable APK must be built by the GitHub Actions pipeline so it includes the verified Android/Bionic QEMU runtime and matching AAVMF firmware.
+Open this directory in Android Studio with JDK 17 and Android SDK Platform 35. The distributable APK must be built through GitHub Actions so it includes the ARM64 PRoot executable and its companion loader.
 
-## QEMU Ubuntu runtime
+The Android CI pipeline:
+1. Builds PRoot from the pinned Android build scripts with Android NDK r23c.
+2. Packages `libproot.so` and `libproot-loader.so` in the APK's `arm64-v8a` native-library directory.
+3. Runs Android unit tests and assembles the debug APK.
 
-QEMU System Emulation is the only active Android Linux engine. PRoot is no longer downloaded, packaged, or selected by the Android installer.
+## Ubuntu environment
 
-The build pipeline works in two stages:
-1. **Build QEMU for Android ARM64** with the official Android NDK and package its shared libraries plus AAVMF UEFI firmware.
-2. **Android CI** downloads that exact workflow artifact, verifies its checksums, places the runtime in APK assets, runs the Android unit tests, and builds the debug APK.
+Run `install-ubuntu` once. NEXORA downloads Canonical's Ubuntu Base 24.04.5 ARM64 archive, checks it against the official SHA256SUMS manifest, and extracts it into app-private storage. Keep at least 700 MB free during setup.
 
-The terminal commands are:
-- `qemu-check`: extract and verify QEMU, its shared libraries, and Android linker startup.
-- `install-ubuntu` (alias: `qemu-install`): install the bundled QEMU runtime, download and verify the official Ubuntu 24.04 ARM64 cloud disk, and prepare UEFI plus NoCloud first-boot media.
-- `qemu-start` / `qemu-stop`: start or stop the persistent headless VM.
-- `qemu-status` / `ubuntu-status`: show runtime and VM preparation state.
+After installation, Linux commands such as `pwd`, `ls`, `apt`, and `bash` run inside Ubuntu through PRoot. PRoot uses Android's kernel; it is not a virtual machine and does not boot a separate Ubuntu kernel.
 
-After `qemu-start`, the terminal input and output are connected to Ubuntu's serial console. The initial VM build has networking disabled. A successful APK build verifies packaging and compilation; Ubuntu boot and persistence must still be tested on a physical ARM64 Android device.
+Current limitation: each entered command starts a separate Ubuntu process. A persistent interactive shell, terminal input streaming, and working-directory persistence are not implemented yet.
 
-See [the QEMU Android architecture and acceptance criteria](../docs/QEMU_ANDROID_MIGRATION.md).
+See [the Android PRoot architecture and acceptance criteria](../docs/PROOT_ANDROID.md).

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="NexoraTheme" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:fontFamily">monospace</item>
-        <item name="android:colorAccent">#7DD3FC</item>
-        <item name="android:statusBarColor">#10141D</item>
-        <item name="android:navigationBarColor">#10141D</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#B7F36B</item>
+        <item name="android:statusBarColor">#080F12</item>
+        <item name="android:navigationBarColor">#080F12</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowBackground">#10141D</item>
+        <item name="android:windowBackground">#080F12</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 </resources>

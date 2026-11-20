@@ -12,108 +12,64 @@ import android.os.Build
 import android.os.IBinder
 import java.io.File
 
-/** Runs a user-started Ubuntu command while NEXORA is in the background. */
+/** Runs user-started Ubuntu PRoot installation and commands in the background. */
 class TerminalExecutionService : Service() {
     private val notificationId = 4101
     private val channelId = "nexora_terminal_tasks"
-    @Volatile private var qemuController: QemuVmController? = null
+    @Volatile private var activeInput: ((String) -> Unit)? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    override fun onDestroy() {
-        // Never wait for QEMU on Android's main thread: process shutdown can take several seconds.
-        val controller = qemuController
-        qemuController = null
-        if (controller != null) {
-            Thread({ runCatching { controller.stop() } }, "nexora-qemu-destroy").apply {
-                isDaemon = true
-                start()
-            }
-        }
-        super.onDestroy()
-    }
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
-
-        if (action == ACTION_QUERY_QEMU_VM) {
-            val running = qemuController?.isRunning == true
-            sendBroadcast(Intent(
-                if (running) ACTION_QEMU_VM_STARTED else ACTION_QEMU_VM_STOPPED
-            ).setPackage(packageName).putExtra(EXTRA_QEMU_VM_EXIT, 0))
-            return START_NOT_STICKY
-        }
-        if (action == ACTION_QEMU_VM_INPUT) {
-            val text = intent?.getStringExtra(EXTRA_QEMU_INPUT).orEmpty()
-            try {
-                qemuController?.sendSerial(text) ?: sendOutput("QEMU VM is not running.")
-            } catch (error: Exception) {
-                sendOutput("QEMU input failed: ${error.message ?: "unknown error"}")
-            }
-            return START_NOT_STICKY
-        }
-        if (action == ACTION_STOP_QEMU_VM) {
-            val controller = qemuController
-            if (controller == null) {
-                sendBroadcast(Intent(ACTION_QEMU_VM_STOPPED).setPackage(packageName)
-                    .putExtra(EXTRA_QEMU_VM_EXIT, 0))
+        if (action == ACTION_SEND_INPUT) {
+            val value = intent.getStringExtra(EXTRA_INPUT).orEmpty()
+            val writer = activeInput
+            if (writer != null) {
+                val appendNewline = intent.getBooleanExtra(EXTRA_INPUT_APPEND_NEWLINE, true)
+                writer(if (appendNewline) value + "\n" else value)
             } else {
-                updateNotification("Stopping Ubuntu virtual machine…")
-                // QEMU shutdown waits for the child process. Keep that wait off the main thread.
-                Thread({
-                    runCatching { controller.stop() }.onFailure { error ->
-                        sendOutput("QEMU shutdown warning: ${error.message ?: "unknown error"}")
-                    }
-                }, "nexora-qemu-stop").apply {
-                    isDaemon = true
-                    start()
-                }
+                sendOutput("nex: no running process is accepting input.")
             }
             return START_NOT_STICKY
         }
-
-        val prepareQemuUbuntu = action == ACTION_PREPARE_QEMU_UBUNTU
-        val startQemuVm = action == ACTION_START_QEMU_VM
+        val prepareUbuntu = action == ACTION_PREPARE_PROOT_UBUNTU
         val command = intent?.getStringExtra(EXTRA_COMMAND)
         val username = intent?.getStringExtra(EXTRA_USERNAME) ?: "user"
         val hostname = intent?.getStringExtra(EXTRA_HOSTNAME) ?: "nexora"
         val uid = intent?.getIntExtra(EXTRA_UID, 10000) ?: 10000
         val treeUri = intent?.getStringExtra(EXTRA_TREE_URI)?.let(Uri::parse)
-        if (!prepareQemuUbuntu && !startQemuVm && command.isNullOrBlank()) {
+
+        if (!prepareUbuntu && command.isNullOrBlank()) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
         createNotificationChannel()
-        val taskLabel = when {
-            prepareQemuUbuntu -> "Installing QEMU and preparing Ubuntu 24.04 ARM64 VM…"
-            startQemuVm -> "Starting Ubuntu virtual machine…"
-            else -> "Running: $command"
+        val label = if (prepareUbuntu) {
+            "Preparing Ubuntu 24.04 with PRoot…"
+        } else {
+            "Running Ubuntu command: $command"
         }
-        val notification = buildNotification(taskLabel, true)
+        val notification = buildNotification(label, true)
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
             startForeground(notificationId, notification)
         }
 
-        if (prepareQemuUbuntu) {
-            sendOutput("Installing QEMU and preparing the independent Ubuntu ARM64 VM.")
+        if (prepareUbuntu) {
+            sendOutput("Preparing the Ubuntu 24.04 ARM64 root filesystem with PRoot.")
             LinuxRuntimeFactory.create(this).install(username, hostname, { message ->
                 sendOutput(message)
                 updateNotification(message)
             }) { success, message, _ ->
-                finishQemuInstall(startId, success, message)
+                finishInstall(startId, success, message)
             }
             return START_NOT_STICKY
         }
 
-        if (startQemuVm) {
-            startQemuVirtualMachine(startId)
-            return START_NOT_STICKY
-        }
-
-        Thread {
+        Thread({
             val bridge = AndroidFolderBridge(this)
             try {
                 if (treeUri != null) {
@@ -125,93 +81,42 @@ class TerminalExecutionService : Service() {
                         prefs.edit().putString("android_tree_imported_uri", treeUri.toString()).apply()
                     }
                 }
+                activeInput = null
                 LinuxRuntimeFactory.create(this).execute(
                     command.orEmpty(),
                     username,
                     uid,
                     if (treeUri != null) bridge.sharedDirectory else null,
                     { line ->
-                        sendOutput(line)
-                        updateNotification("Running: $command")
-                    }
+                        sendOutputChunk(line)
+                        updateNotification("Running Ubuntu command")
+                    },
+                    { writer -> activeInput = writer }
                 ) { code ->
-                    finish(startId, code, treeUri, bridge)
+                    activeInput = null
+                    finishCommand(startId, code, treeUri, bridge)
                 }
             } catch (error: Exception) {
                 sendOutput("nex: " + (error.message ?: "Could not start command"))
-                finish(startId, 1, treeUri, bridge)
+                finishCommand(startId, 1, treeUri, bridge)
             }
-        }.start()
+        }, "nexora-ubuntu-command").start()
         return START_NOT_STICKY
     }
 
-    private fun startQemuVirtualMachine(startId: Int) {
-        if (qemuController?.isRunning == true) {
-            sendBroadcast(Intent(ACTION_QEMU_VM_STARTED).setPackage(packageName))
-            updateNotification("Ubuntu VM is running")
-            return
-        }
-        Thread {
-            try {
-                val installer = QemuBinaryInstaller(this)
-                val qemu = installer.installFromAssets()
-                sendOutput(installer.smokeTest(qemu))
-                val firmware = installer.installFirmwareFromAssets()
-                val writableVars = installer.prepareWritableFirmwareVars(firmware)
-                val vmDirectory = File(filesDir, "qemu/vm")
-                val disk = File(vmDirectory, "ubuntu-24.04-arm64.qcow2")
-                val seed = File(vmDirectory, "cidata.img")
-                check(disk.isFile && seed.isFile) { "Run qemu-install before qemu-start." }
-
-                val controller = QemuVmController(qemu)
-                qemuController = controller
-                controller.start(
-                    diskImage = disk,
-                    firmwareCode = firmware.code,
-                    firmwareVars = writableVars,
-                    seedImage = seed,
-                    memoryMb = 1024,
-                    cpuCount = 2,
-                    onOutput = { chunk ->
-                        sendQemuSerialOutput(chunk)
-                    },
-                    onExit = { code ->
-                        qemuController = null
-                        sendOutput("QEMU virtual machine stopped (exit $code).")
-                        sendBroadcast(Intent(ACTION_QEMU_VM_STOPPED).setPackage(packageName)
-                            .putExtra(EXTRA_QEMU_VM_EXIT, code))
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                        stopSelf(startId)
-                    }
-                )
-                sendBroadcast(Intent(ACTION_QEMU_VM_STARTED).setPackage(packageName))
-                sendOutput("QEMU process started. Ubuntu is booting on the serial console…")
-                updateNotification("Ubuntu VM is running")
-            } catch (error: Exception) {
-                qemuController = null
-                val message = error.message ?: "Could not start QEMU."
-                sendOutput("QEMU startup failed: $message")
-                sendBroadcast(Intent(ACTION_QEMU_VM_STOPPED).setPackage(packageName)
-                    .putExtra(EXTRA_QEMU_VM_EXIT, -1))
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf(startId)
-            }
-        }.start()
-    }
-
-    private fun finishQemuInstall(startId: Int, success: Boolean, message: String) {
-        sendBroadcast(Intent(ACTION_QEMU_INSTALL_FINISHED).setPackage(packageName)
-            .putExtra(EXTRA_QEMU_INSTALL_SUCCESS, success)
-            .putExtra(EXTRA_QEMU_INSTALL_MESSAGE, message))
+    private fun finishInstall(startId: Int, success: Boolean, message: String) {
+        sendBroadcast(Intent(ACTION_PROOT_INSTALL_FINISHED).setPackage(packageName)
+            .putExtra(EXTRA_INSTALL_SUCCESS, success)
+            .putExtra(EXTRA_INSTALL_MESSAGE, message))
         getSystemService(NotificationManager::class.java).notify(
             notificationId + 1,
-            buildNotification(if (success) "Ubuntu VM prepared" else "Ubuntu VM preparation failed", false)
+            buildNotification(if (success) "Ubuntu PRoot environment ready" else "Ubuntu PRoot preparation failed", false)
         )
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf(startId)
     }
 
-    private fun finish(startId: Int, code: Int, treeUri: Uri?, bridge: AndroidFolderBridge) {
+    private fun finishCommand(startId: Int, code: Int, treeUri: Uri?, bridge: AndroidFolderBridge) {
         try {
             if (treeUri != null) {
                 bridge.exportTree(treeUri)
@@ -226,16 +131,17 @@ class TerminalExecutionService : Service() {
             buildNotification("Command finished (exit $code)", false)
         )
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf(startId)
-    }
-
-    private fun sendQemuSerialOutput(chunk: String) {
-        sendBroadcast(Intent(ACTION_QEMU_SERIAL_OUTPUT).setPackage(packageName)
-            .putExtra(EXTRA_QEMU_SERIAL_TEXT, chunk))
+        // Input intents increment the service startId while a command is running.
+        // Stop the completed session regardless of those newer input start IDs.
+        stopSelf()
     }
 
     private fun sendOutput(line: String) {
         sendBroadcast(Intent(ACTION_OUTPUT).setPackage(packageName).putExtra(EXTRA_OUTPUT, line))
+    }
+
+    private fun sendOutputChunk(chunk: String) {
+        sendBroadcast(Intent(ACTION_OUTPUT_CHUNK).setPackage(packageName).putExtra(EXTRA_OUTPUT, chunk))
     }
 
     private fun updateNotification(message: String) {
@@ -281,28 +187,23 @@ class TerminalExecutionService : Service() {
     }
 
     companion object {
-        const val ACTION_PREPARE_QEMU_UBUNTU = "dev.atdev.nexora.PREPARE_QEMU_UBUNTU"
-        const val ACTION_START_QEMU_VM = "dev.atdev.nexora.START_QEMU_VM"
-        const val ACTION_STOP_QEMU_VM = "dev.atdev.nexora.STOP_QEMU_VM"
-        const val ACTION_QEMU_VM_INPUT = "dev.atdev.nexora.QEMU_VM_INPUT"
-        const val ACTION_QUERY_QEMU_VM = "dev.atdev.nexora.QUERY_QEMU_VM"
-        const val ACTION_QEMU_INSTALL_FINISHED = "dev.atdev.nexora.QEMU_INSTALL_FINISHED"
-        const val ACTION_QEMU_VM_STARTED = "dev.atdev.nexora.QEMU_VM_STARTED"
-        const val ACTION_QEMU_VM_STOPPED = "dev.atdev.nexora.QEMU_VM_STOPPED"
-        const val ACTION_QEMU_SERIAL_OUTPUT = "dev.atdev.nexora.QEMU_SERIAL_OUTPUT"
-        const val EXTRA_QEMU_SERIAL_TEXT = "qemu_serial_text"
-        const val EXTRA_HOSTNAME = "hostname"
-        const val EXTRA_QEMU_INPUT = "qemu_input"
-        const val EXTRA_QEMU_INSTALL_SUCCESS = "qemu_install_success"
-        const val EXTRA_QEMU_INSTALL_MESSAGE = "qemu_install_message"
-        const val EXTRA_QEMU_VM_EXIT = "qemu_vm_exit"
+        const val ACTION_PREPARE_PROOT_UBUNTU = "dev.atdev.nexora.PREPARE_PROOT_UBUNTU"
+        const val ACTION_PROOT_INSTALL_FINISHED = "dev.atdev.nexora.PROOT_INSTALL_FINISHED"
+        const val ACTION_EXECUTE_COMMAND = "dev.atdev.nexora.EXECUTE_COMMAND"
+        const val ACTION_SEND_INPUT = "dev.atdev.nexora.SEND_TERMINAL_INPUT"
         const val EXTRA_COMMAND = "command"
+        const val EXTRA_INPUT = "terminal_input"
+        const val EXTRA_INPUT_APPEND_NEWLINE = "terminal_input_append_newline"
         const val EXTRA_USERNAME = "username"
+        const val EXTRA_HOSTNAME = "hostname"
         const val EXTRA_UID = "uid"
         const val EXTRA_TREE_URI = "tree_uri"
         const val EXTRA_OUTPUT = "output"
         const val EXTRA_EXIT_CODE = "exit_code"
+        const val EXTRA_INSTALL_SUCCESS = "install_success"
+        const val EXTRA_INSTALL_MESSAGE = "install_message"
         const val ACTION_OUTPUT = "dev.atdev.nexora.TERMINAL_OUTPUT"
+        const val ACTION_OUTPUT_CHUNK = "dev.atdev.nexora.TERMINAL_OUTPUT_CHUNK"
         const val ACTION_FINISHED = "dev.atdev.nexora.TERMINAL_FINISHED"
     }
 }
