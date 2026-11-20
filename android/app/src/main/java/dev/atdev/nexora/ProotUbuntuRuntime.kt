@@ -151,7 +151,7 @@ class ProotUbuntuRuntime(context: Context) : LinuxRuntimeEngine {
                         val widthDp = metrics.widthPixels / metrics.scaledDensity
                         val heightDp = metrics.heightPixels / metrics.scaledDensity
                         environment()["NEXORA_PTY_COLS"] = (widthDp / 7.5f).toInt().coerceIn(20, 240).toString()
-                        environment()["NEXORA_PTY_ROWS"] = (heightDp / 18f).toInt().coerceIn(8, 80).toString()
+                        environment()["NEXORA_PTY_ROWS"] = (heightDp * 0.55f / 18f).toInt().coerceIn(8, 64).toString()
                     }
                     .start()
                 onInputReady { value ->
